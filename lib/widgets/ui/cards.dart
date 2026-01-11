@@ -119,11 +119,11 @@ class StatCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             title,
             style: const TextStyle(
-              fontSize: 14,
+              fontSize: 13,
               color: AppTheme.textSecondary,
               fontWeight: FontWeight.w500,
             ),
@@ -134,7 +134,7 @@ class StatCard extends StatelessWidget {
             child: Text(
               value,
               style: const TextStyle(
-                fontSize: 24,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.textPrimary,
               ),

@@ -125,6 +125,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
     return DesktopLayout(
       title: 'Quản lý đơn hàng',
       actions: [
+        if (GoRouterState.of(context).uri.queryParameters['from'] == 'pos')
+          SecondaryButton(
+            onPressed: () => context.go('/pos'),
+            icon: Icons.storefront,
+            label: 'Quay lại POS',
+          ),
+        const SizedBox(width: 8),
         PrimaryButton(
           onPressed: () => context.go('/orders/create'),
           icon: Icons.add,

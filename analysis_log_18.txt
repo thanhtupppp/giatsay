@@ -1,9 +1,0 @@
-Analyzing giatsay...                                            
-
-  error - 1 positional argument expected by 'showAppAlertDialog', but 0 found - lib\screens\inventory\material_list_screen.dart:51:11 - not_enough_positional_arguments
-  error - The named parameter 'context' isn't defined - lib\screens\inventory\material_list_screen.dart:51:11 - undefined_named_parameter
-   info - Statements in an if should be enclosed in a block - lib\screens\inventory\material_list_screen.dart:130:31 - curly_braces_in_flow_control_structures
-   info - Statements in an if should be enclosed in a block - lib\screens\inventory\material_list_screen.dart:154:31 - curly_braces_in_flow_control_structures
-  error - The method 'showAppDialog' isn't defined for the type '_MaterialListScreenState' - lib\screens\inventory\material_list_screen.dart:237:11 - undefined_method
-  error - The method 'showAppDialog' isn't defined for the type '_MaterialListScreenState' - lib\screens\inventory\material_list_screen.dart:278:11 - undefined_method
-

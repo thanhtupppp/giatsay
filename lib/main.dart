@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/date_symbol_data_local.dart';
+
 import 'core/services/auth_service.dart';
+import 'core/services/backup_service.dart';
 import 'config/theme.dart';
+import 'widgets/layouts/desktop_layout.dart';
+
 import 'screens/auth/login_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/orders/order_list_screen.dart';
@@ -12,16 +17,12 @@ import 'screens/customers/customer_detail_screen.dart';
 import 'screens/services/service_list_screen.dart';
 import 'screens/users/user_list_screen.dart';
 import 'screens/transactions/transaction_list_screen.dart';
-
 import 'screens/salaries/salary_list_screen.dart';
 import 'screens/assets/asset_list_screen.dart';
 import 'screens/settings/settings_screen.dart';
 import 'screens/inventory/material_list_screen.dart';
 import 'screens/timesheets/timesheet_screen.dart';
-import 'core/services/backup_service.dart';
 import 'screens/pos/pos_screen.dart';
-
-import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,11 +39,16 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Determine the user's preferred locale
+    // Start with 'vi' (Vietnamese) as the default
+    const locale = Locale('vi');
+
     return MaterialApp.router(
       title: 'Laundry Management',
       theme: AppTheme.lightTheme,
       routerConfig: _router,
       debugShowCheckedModeBanner: false,
+      locale: locale,
     );
   }
 }
@@ -66,68 +72,88 @@ final _router = GoRouter(
   routes: [
     GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
     GoRoute(path: '/pos', builder: (context, state) => const POSScreen()),
-    GoRoute(
-      path: '/dashboard',
-      builder: (context, state) => const DashboardScreen(),
-    ),
-    GoRoute(
-      path: '/orders',
-      builder: (context, state) => const OrderListScreen(),
-    ),
-    GoRoute(
-      path: '/orders/create',
-      builder: (context, state) => const CreateOrderScreen(),
-    ),
-    GoRoute(
-      path: '/orders/:id',
-      builder: (context, state) {
-        final id = int.parse(state.pathParameters['id']!);
-        return OrderDetailScreen(orderId: id);
+    ShellRoute(
+      builder: (context, state, child) {
+        return AppShell(child: child);
       },
-    ),
-    GoRoute(
-      path: '/customers',
-      builder: (context, state) => const CustomerListScreen(),
-    ),
-    GoRoute(
-      path: '/customers/:id',
-      builder: (context, state) {
-        final id = int.parse(state.pathParameters['id']!);
-        return CustomerDetailScreen(customerId: id);
-      },
-    ),
-    GoRoute(
-      path: '/services',
-      builder: (context, state) => const ServiceListScreen(),
-    ),
-    GoRoute(
-      path: '/users',
-      builder: (context, state) => const UserListScreen(),
-    ),
-    GoRoute(
-      path: '/transactions',
-      builder: (context, state) => const TransactionListScreen(),
-    ),
-
-    GoRoute(
-      path: '/salaries',
-      builder: (context, state) => const SalaryListScreen(),
-    ),
-    GoRoute(
-      path: '/assets',
-      builder: (context, state) => const AssetListScreen(),
-    ),
-    GoRoute(
-      path: '/settings',
-      builder: (context, state) => const SettingsScreen(),
-    ),
-    GoRoute(
-      path: '/inventory',
-      builder: (context, state) => const MaterialListScreen(),
-    ),
-    GoRoute(
-      path: '/shifts',
-      builder: (context, state) => const TimesheetScreen(),
+      routes: [
+        GoRoute(
+          path: '/dashboard',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: DashboardScreen()),
+        ),
+        GoRoute(
+          path: '/orders',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: OrderListScreen()),
+        ),
+        GoRoute(
+          path: '/orders/create',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: CreateOrderScreen()),
+        ),
+        GoRoute(
+          path: '/orders/:id',
+          pageBuilder: (context, state) {
+            final id = int.parse(state.pathParameters['id']!);
+            return NoTransitionPage(child: OrderDetailScreen(orderId: id));
+          },
+        ),
+        GoRoute(
+          path: '/customers',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: CustomerListScreen()),
+        ),
+        GoRoute(
+          path: '/customers/:id',
+          pageBuilder: (context, state) {
+            final id = int.parse(state.pathParameters['id']!);
+            return NoTransitionPage(
+              child: CustomerDetailScreen(customerId: id),
+            );
+          },
+        ),
+        GoRoute(
+          path: '/services',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: ServiceListScreen()),
+        ),
+        GoRoute(
+          path: '/users',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: UserListScreen()),
+        ),
+        GoRoute(
+          path: '/transactions',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: TransactionListScreen()),
+        ),
+        GoRoute(
+          path: '/salaries',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: SalaryListScreen()),
+        ),
+        GoRoute(
+          path: '/assets',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: AssetListScreen()),
+        ),
+        GoRoute(
+          path: '/settings',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: SettingsScreen()),
+        ),
+        GoRoute(
+          path: '/inventory',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: MaterialListScreen()),
+        ),
+        GoRoute(
+          path: '/shifts',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: TimesheetScreen()),
+        ),
+      ],
     ),
   ],
 );

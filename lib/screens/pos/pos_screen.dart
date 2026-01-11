@@ -258,8 +258,16 @@ class _POSScreenState extends State<POSScreen>
       isLoading:
           _isLoading && _scannedOrder == null, // Only block if loading initial
       actions: [
+        SecondaryButton(
+          onPressed: () => context.go('/dashboard'),
+          label: 'Dashboard',
+          icon: Icons.arrow_back,
+        ),
+        const SizedBox(width: 12),
         PrimaryButton(
-          onPressed: () => context.go('/orders'),
+          onPressed: () => context.push(
+            Uri(path: '/orders', queryParameters: {'from': 'pos'}).toString(),
+          ),
           label: 'Danh sách đơn',
           icon: Icons.list_alt,
         ),

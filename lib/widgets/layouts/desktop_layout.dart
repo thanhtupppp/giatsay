@@ -5,6 +5,27 @@ import '../../config/theme.dart';
 import '../../config/constants.dart';
 import '../ui/dialogs.dart';
 
+/// The Shell containing the persistent Sidebar
+class AppShell extends StatelessWidget {
+  final Widget child;
+
+  const AppShell({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50], // Light background for content area
+      body: Row(
+        children: [
+          const AppSidebar(),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
+
+/// The layout for individual pages (Header + Content)
 class DesktopLayout extends StatelessWidget {
   final Widget child;
   final String title;
@@ -21,37 +42,30 @@ class DesktopLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Scaffold(
-          backgroundColor: Colors.grey[50], // Light background for content area
-          body: Row(
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      body: Stack(
+        children: [
+          Column(
             children: [
-              const _Sidebar(),
+              _Header(title: title, actions: actions),
               Expanded(
-                child: Column(
-                  children: [
-                    _Header(title: title, actions: actions),
-                    Expanded(
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 1400),
-                          child: child,
-                        ),
-                      ),
-                    ),
-                  ],
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1400),
+                    child: child,
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-        if (isLoading)
-          Container(
-            color: Colors.black54,
-            child: const Center(child: CircularProgressIndicator()),
-          ),
-      ],
+          if (isLoading)
+            Container(
+              color: Colors.black54,
+              child: const Center(child: CircularProgressIndicator()),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -180,8 +194,8 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _Sidebar extends StatelessWidget {
-  const _Sidebar();
+class AppSidebar extends StatelessWidget {
+  const AppSidebar({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -7,15 +7,12 @@ import '../../repositories/customer_repository.dart';
 import '../../repositories/order_repository.dart';
 import '../../config/theme.dart';
 import '../../config/constants.dart';
-import '../../widgets/main_layout.dart';
+import '../../widgets/layouts/desktop_layout.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
   final int customerId;
-  
-  const CustomerDetailScreen({
-    super.key,
-    required this.customerId,
-  });
+
+  const CustomerDetailScreen({super.key, required this.customerId});
 
   @override
   State<CustomerDetailScreen> createState() => _CustomerDetailScreenState();
@@ -24,36 +21,36 @@ class CustomerDetailScreen extends StatefulWidget {
 class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   final _customerRepo = CustomerRepository();
   final _orderRepo = OrderRepository();
-  
+
   Customer? _customer;
   List<Map<String, dynamic>> _orders = [];
   bool _isLoading = true;
-  
+
   double _totalSpent = 0;
   int _totalOrders = 0;
   int _pendingOrders = 0;
-  
+
   @override
   void initState() {
     super.initState();
     _loadCustomerDetails();
   }
-  
+
   Future<void> _loadCustomerDetails() async {
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       final customer = await _customerRepo.getById(widget.customerId);
       if (customer == null) throw Exception('Không tìm thấy khách hàng');
-      
+
       final orders = await _orderRepo.getOrdersByCustomer(widget.customerId);
-      
+
       // Calculate statistics
       double totalSpent = 0;
       int pendingOrders = 0;
-      
+
       for (final order in orders) {
         totalSpent += (order['total_amount'] as num).toDouble();
         final status = order['status'] as String;
@@ -61,7 +58,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
           pendingOrders++;
         }
       }
-      
+
       setState(() {
         _customer = customer;
         _orders = orders;
@@ -84,24 +81,28 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       }
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const MainLayout(
+      return const DesktopLayout(
         title: 'Chi tiết khách hàng',
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    
+
     if (_customer == null) {
-      return MainLayout(
+      return DesktopLayout(
         title: 'Chi tiết khách hàng',
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 64, color: AppTheme.textSecondary),
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: AppTheme.textSecondary,
+              ),
               const SizedBox(height: 16),
               const Text('Không tìm thấy khách hàng'),
               const SizedBox(height: 16),
@@ -114,8 +115,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         ),
       );
     }
-    
-    return MainLayout(
+
+    return DesktopLayout(
       title: 'Chi tiết khách hàng',
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -147,14 +148,15 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _customer!.name,
-                        style: AppTheme.heading2,
-                      ),
+                      Text(_customer!.name, style: AppTheme.heading2),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.phone, size: 16, color: AppTheme.textSecondary),
+                          Icon(
+                            Icons.phone,
+                            size: 16,
+                            color: AppTheme.textSecondary,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             _customer!.phone,
@@ -168,7 +170,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            
+
             // Statistics cards
             Row(
               children: [
@@ -193,7 +195,10 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                 Expanded(
                   child: _buildStatCard(
                     'Tổng chi tiêu',
-                    NumberFormat.currency(locale: 'vi', symbol: 'đ').format(_totalSpent),
+                    NumberFormat.currency(
+                      locale: 'vi',
+                      symbol: 'đ',
+                    ).format(_totalSpent),
                     Icons.account_balance_wallet,
                     AppTheme.successColor,
                   ),
@@ -201,7 +206,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            
+
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -227,7 +232,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                             _buildInfoRow('Địa chỉ', _customer!.address!),
                           _buildInfoRow(
                             'Ngày tạo',
-                            DateFormat('dd/MM/yyyy').format(_customer!.createdAt),
+                            DateFormat(
+                              'dd/MM/yyyy',
+                            ).format(_customer!.createdAt),
                           ),
                         ],
                       ),
@@ -235,7 +242,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                
+
                 // Right - Order history
                 Expanded(
                   flex: 2,
@@ -260,7 +267,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                             ],
                           ),
                           const Divider(height: 24),
-                          
+
                           if (_orders.isEmpty)
                             Center(
                               child: Padding(
@@ -310,10 +317,13 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                 ],
                                 rows: _orders.map((order) {
                                   final status = order['status'] as String;
-                                  final statusColor = AppTheme.getStatusColor(status);
-                                  
+                                  final statusColor = AppTheme.getStatusColor(
+                                    status,
+                                  );
+
                                   return DataRow2(
-                                    onTap: () => context.go('/orders/${order['id']}'),
+                                    onTap: () =>
+                                        context.go('/orders/${order['id']}'),
                                     cells: [
                                       DataCell(
                                         Text(
@@ -327,15 +337,21 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                       DataCell(
                                         Text(
                                           DateFormat('dd/MM/yyyy').format(
-                                            DateTime.parse(order['received_date'] as String),
+                                            DateTime.parse(
+                                              order['received_date'] as String,
+                                            ),
                                           ),
                                         ),
                                       ),
                                       DataCell(
                                         Text(
-                                          NumberFormat.currency(locale: 'vi', symbol: 'đ')
-                                              .format(order['total_amount']),
-                                          style: const TextStyle(fontWeight: FontWeight.w600),
+                                          NumberFormat.currency(
+                                            locale: 'vi',
+                                            symbol: 'đ',
+                                          ).format(order['total_amount']),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
                                       ),
                                       DataCell(
@@ -345,12 +361,19 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                             vertical: 4,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: statusColor.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(4),
-                                            border: Border.all(color: statusColor),
+                                            color: statusColor.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                            border: Border.all(
+                                              color: statusColor,
+                                            ),
                                           ),
                                           child: Text(
-                                            AppConstants.orderStatusLabels[status]!,
+                                            AppConstants
+                                                .orderStatusLabels[status]!,
                                             style: TextStyle(
                                               color: statusColor,
                                               fontSize: 12,
@@ -376,8 +399,13 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       ),
     );
   }
-  
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -397,10 +425,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                 const SizedBox(width: 12),
                 Text(
                   title,
-                  style: TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                 ),
               ],
             ),
@@ -417,7 +442,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       ),
     );
   }
-  
+
   Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -428,19 +453,13 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             width: 120,
             child: Text(
               label,
-              style: TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
             ),
           ),
         ],

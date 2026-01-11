@@ -12,7 +12,7 @@ import '../../core/services/auth_service.dart';
 import '../../core/services/print_service.dart';
 import '../../config/theme.dart';
 import '../../config/constants.dart';
-import '../../widgets/main_layout.dart';
+import '../../widgets/layouts/desktop_layout.dart';
 
 class CreateOrderScreen extends StatefulWidget {
   const CreateOrderScreen({super.key});
@@ -471,7 +471,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return MainLayout(
+    return DesktopLayout(
       title: 'Tạo đơn hàng mới',
       child: _isLoading
           ? const Center(child: CircularProgressIndicator())
