@@ -9,6 +9,9 @@ import '../../repositories/customer_repository.dart';
 import '../../config/theme.dart';
 import '../../config/constants.dart';
 import '../../widgets/numeric_keypad_widget.dart';
+import '../../widgets/layouts/desktop_layout.dart';
+import '../../widgets/ui/cards.dart';
+import '../../widgets/ui/buttons.dart';
 import 'pos_create_order_widget.dart';
 
 /// POS Screen với 3 bước kiểm soát bằng mã vạch:
@@ -250,56 +253,27 @@ class _POSScreenState extends State<POSScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/dashboard'),
-          tooltip: 'Quay lại',
+    return DesktopLayout(
+      title: 'Bán hàng (POS)',
+      isLoading:
+          _isLoading && _scannedOrder == null, // Only block if loading initial
+      actions: [
+        PrimaryButton(
+          onPressed: () => context.go('/orders'),
+          label: 'Danh sách đơn',
+          icon: Icons.list_alt,
         ),
-        title: Row(
-          children: [
-            Icon(Icons.point_of_sale, color: Colors.white),
-            const SizedBox(width: 12),
-            const Text('POS - Quét mã vạch'),
-          ],
-        ),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 2,
-        actions: [
-          // Quick link to orders
-          TextButton.icon(
-            onPressed: () => context.go('/orders'),
-            icon: const Icon(Icons.list_alt, color: Colors.white70),
-            label: const Text(
-              'Danh sách đơn',
-              style: TextStyle(color: Colors.white70),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Column(
+      ],
+      child: Column(
         children: [
           // Tab bar - modernized
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
+          AppCard(
+            padding: EdgeInsets.zero,
             child: TabBar(
               controller: _tabController,
-              labelColor: const Color(0xFF1565C0),
+              labelColor: AppTheme.primaryColor,
               unselectedLabelColor: Colors.grey[500],
-              indicatorColor: const Color(0xFF1565C0),
+              indicatorColor: AppTheme.primaryColor,
               indicatorWeight: 4,
               indicatorSize: TabBarIndicatorSize.label,
               labelStyle: const TextStyle(
@@ -320,7 +294,7 @@ class _POSScreenState extends State<POSScreen>
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: _tabController.index == 0
-                              ? const Color(0xFF1565C0).withValues(alpha: 0.1)
+                              ? AppTheme.primaryColor.withValues(alpha: 0.1)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -366,7 +340,7 @@ class _POSScreenState extends State<POSScreen>
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: _tabController.index == 2
-                              ? const Color(0xFF4CAF50).withValues(alpha: 0.1)
+                              ? Colors.green.withValues(alpha: 0.1)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -374,7 +348,7 @@ class _POSScreenState extends State<POSScreen>
                           Icons.check_circle,
                           size: 28,
                           color: _tabController.index == 2
-                              ? const Color(0xFF4CAF50)
+                              ? Colors.green
                               : null,
                         ),
                       ),
@@ -387,12 +361,14 @@ class _POSScreenState extends State<POSScreen>
             ),
           ),
 
+          const SizedBox(height: 16),
+
           // Messages
           if (_errorMessage != null)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.all(16),
+              margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
                 color: AppTheme.errorColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
@@ -402,12 +378,12 @@ class _POSScreenState extends State<POSScreen>
               ),
               child: Row(
                 children: [
-                  Icon(Icons.error, color: AppTheme.errorColor, size: 28),
+                  const Icon(Icons.error, color: AppTheme.errorColor, size: 28),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       _errorMessage!,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: AppTheme.errorColor,
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
@@ -415,7 +391,7 @@ class _POSScreenState extends State<POSScreen>
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: AppTheme.errorColor),
+                    icon: const Icon(Icons.close, color: AppTheme.errorColor),
                     onPressed: () => setState(() => _errorMessage = null),
                   ),
                 ],
@@ -426,7 +402,7 @@ class _POSScreenState extends State<POSScreen>
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.all(16),
+              margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
                 color: AppTheme.successColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
@@ -436,7 +412,7 @@ class _POSScreenState extends State<POSScreen>
               ),
               child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.check_circle,
                     color: AppTheme.successColor,
                     size: 28,
@@ -445,7 +421,7 @@ class _POSScreenState extends State<POSScreen>
                   Expanded(
                     child: Text(
                       _successMessage!,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: AppTheme.successColor,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -453,7 +429,7 @@ class _POSScreenState extends State<POSScreen>
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: AppTheme.successColor),
+                    icon: const Icon(Icons.close, color: AppTheme.successColor),
                     onPressed: () => setState(() => _successMessage = null),
                   ),
                 ],
@@ -489,7 +465,6 @@ class _POSScreenState extends State<POSScreen>
   Widget _buildWashCompleteTab() {
     if (_scannedOrder == null) {
       return SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
         child: Column(
           children: [
             // Header
@@ -546,7 +521,7 @@ class _POSScreenState extends State<POSScreen>
             // Scanner input field
             Container(
               constraints: const BoxConstraints(maxWidth: 500),
-              child: TextField(
+              child: TextFormField(
                 controller: _barcodeController,
                 focusNode: _barcodeFocusNode,
                 autofocus: true,
@@ -600,7 +575,7 @@ class _POSScreenState extends State<POSScreen>
                   ),
                 ),
                 keyboardType: TextInputType.none, // Hide system keyboard
-                onSubmitted: (_) => _scanBarcode(),
+                onFieldSubmitted: (_) => _scanBarcode(),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               ),
             ),
@@ -610,31 +585,13 @@ class _POSScreenState extends State<POSScreen>
             SizedBox(
               width: 200,
               height: 56,
-              child: ElevatedButton.icon(
+              child: PrimaryButton(
                 onPressed: _isLoading || _barcodeController.text.isEmpty
                     ? null
                     : _scanBarcode,
-                icon: _isLoading
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.search, size: 24),
-                label: const Text(
-                  'TÌM KIẾ́M',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange[600],
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
+                icon: Icons.search,
+                label: 'TÌM KIẾM',
+                isLoading: _isLoading,
               ),
             ),
 
@@ -659,17 +616,12 @@ class _POSScreenState extends State<POSScreen>
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
       child: _buildOrderCard(
-        actionButton: ElevatedButton.icon(
+        actionButton: PrimaryButton(
           onPressed: _isLoading ? null : _markAsWashed,
-          icon: const Icon(Icons.check),
-          label: const Text('XÁC NHẬN GIẶT XONG'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.orange,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-          ),
+          icon: Icons.check,
+          label: 'XÁC NHẬN GIẶT XONG',
+          isLoading: _isLoading,
         ),
       ),
     );
@@ -679,7 +631,6 @@ class _POSScreenState extends State<POSScreen>
   Widget _buildDeliveryTab() {
     if (_scannedOrder == null) {
       return SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
         child: Column(
           children: [
             // Header
@@ -736,7 +687,7 @@ class _POSScreenState extends State<POSScreen>
             // Scanner input field
             Container(
               constraints: const BoxConstraints(maxWidth: 500),
-              child: TextField(
+              child: TextFormField(
                 controller: _barcodeController,
                 focusNode: _barcodeFocusNode,
                 autofocus: true,
@@ -792,7 +743,7 @@ class _POSScreenState extends State<POSScreen>
                   ),
                 ),
                 keyboardType: TextInputType.none, // Hide system keyboard
-                onSubmitted: (_) => _scanBarcode(),
+                onFieldSubmitted: (_) => _scanBarcode(),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               ),
             ),
@@ -856,18 +807,12 @@ class _POSScreenState extends State<POSScreen>
         children: [
           _buildOrderCard(
             showPayment: true,
-            actionButton: ElevatedButton.icon(
+            actionButton: PrimaryButton(
               onPressed: _isLoading ? null : _completeDelivery,
-              icon: const Icon(Icons.check_circle),
-              label: const Text('HOÀN THÀNH TRẢ ĐỒ'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.successColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
-                ),
-              ),
+              icon: Icons.check_circle,
+              label: 'HOÀN THÀNH TRẢ ĐỒ',
+              isLoading: _isLoading,
+              backgroundColor: AppTheme.successColor,
             ),
           ),
         ],
@@ -885,272 +830,267 @@ class _POSScreenState extends State<POSScreen>
     final statusColor = AppTheme.getStatusColor(order.status);
     final currencyFormat = NumberFormat.currency(locale: 'vi', symbol: 'đ');
 
-    return Card(
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.receipt_long,
-                    color: AppTheme.primaryColor,
-                    size: 32,
-                  ),
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header used to be custom Row, now let's use SectionHeader or similar
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Mã đơn: ${order.orderCode}',
-                        style: AppTheme.heading3,
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: statusColor),
-                        ),
-                        child: Text(
-                          AppConstants.orderStatusLabels[order.status] ??
-                              order.status,
-                          style: TextStyle(
-                            color: statusColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                child: const Icon(
+                  Icons.receipt_long,
+                  color: AppTheme.primaryColor,
+                  size: 32,
                 ),
-              ],
-            ),
-
-            const Divider(height: 32),
-
-            // Customer info
-            Row(
-              children: [
-                const Icon(Icons.person, color: Colors.grey),
-                const SizedBox(width: 8),
-                Text(
-                  'Khách hàng: ',
-                  style: AppTheme.bodyMedium.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                Text(
-                  customer.name,
-                  style: AppTheme.bodyLarge.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.phone, color: Colors.grey),
-                const SizedBox(width: 8),
-                Text(
-                  'SĐT: ',
-                  style: AppTheme.bodyMedium.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                Text(customer.phone, style: AppTheme.bodyLarge),
-              ],
-            ),
-
-            const Divider(height: 32),
-
-            // Order items
-            Text(
-              'Chi tiết dịch vụ:',
-              style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            ..._scannedOrderItems.map((item) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        '${item['service_name']} x${item['quantity']}',
-                        style: AppTheme.bodyMedium,
-                      ),
-                    ),
                     Text(
-                      currencyFormat.format(item['subtotal']),
-                      style: AppTheme.bodyMedium.copyWith(
-                        fontWeight: FontWeight.bold,
+                      'Mã đơn: ${order.orderCode}',
+                      style: AppTheme.heading3,
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: statusColor),
+                      ),
+                      child: Text(
+                        AppConstants.orderStatusLabels[order.status] ??
+                            order.status,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              );
-            }),
+              ),
+            ],
+          ),
 
-            const Divider(height: 24),
+          const Divider(height: 32),
 
-            // Total
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('TỔNG CỘNG:', style: AppTheme.heading3),
-                Text(
-                  currencyFormat.format(order.totalAmount),
-                  style: AppTheme.heading2.copyWith(
-                    color: AppTheme.primaryColor,
-                  ),
+          // Customer info
+          Row(
+            children: [
+              const Icon(Icons.person, color: Colors.grey),
+              const SizedBox(width: 8),
+              Text(
+                'Khách hàng: ',
+                style: AppTheme.bodyMedium.copyWith(
+                  color: AppTheme.textSecondary,
                 ),
-              ],
-            ),
+              ),
+              Text(
+                customer.name,
+                style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.phone, color: Colors.grey),
+              const SizedBox(width: 8),
+              Text(
+                'SĐT: ',
+                style: AppTheme.bodyMedium.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              Text(customer.phone, style: AppTheme.bodyLarge),
+            ],
+          ),
 
-            if (order.paidAmount > 0 &&
-                order.paidAmount < order.totalAmount) ...[
-              const SizedBox(height: 8),
-              Row(
+          const Divider(height: 32),
+
+          // Order items
+          Text(
+            'Chi tiết dịch vụ:',
+            style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          ..._scannedOrderItems.map((item) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Đã thanh toán:', style: AppTheme.bodyMedium),
-                  Text(
-                    currencyFormat.format(order.paidAmount),
-                    style: AppTheme.bodyLarge.copyWith(
-                      color: AppTheme.successColor,
+                  Expanded(
+                    child: Text(
+                      '${item['service_name']} x${item['quantity']}',
+                      style: AppTheme.bodyMedium,
                     ),
                   ),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
                   Text(
-                    'Còn lại:',
+                    currencyFormat.format(item['subtotal']),
                     style: AppTheme.bodyMedium.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Text(
-                    currencyFormat.format(order.remainingAmount),
-                    style: AppTheme.heading3.copyWith(
-                      color: AppTheme.errorColor,
+                ],
+              ),
+            );
+          }),
+
+          const Divider(height: 24),
+
+          // Total
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('TỔNG CỘNG:', style: AppTheme.heading3),
+              Text(
+                currencyFormat.format(order.totalAmount),
+                style: AppTheme.heading2.copyWith(color: AppTheme.primaryColor),
+              ),
+            ],
+          ),
+
+          if (order.paidAmount > 0 && order.paidAmount < order.totalAmount) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Đã thanh toán:', style: AppTheme.bodyMedium),
+                Text(
+                  currencyFormat.format(order.paidAmount),
+                  style: AppTheme.bodyLarge.copyWith(
+                    color: AppTheme.successColor,
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Còn lại:',
+                  style: AppTheme.bodyMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  currencyFormat.format(
+                    remainingAmount(order),
+                  ), // Need safe calculation
+                  style: AppTheme.heading3.copyWith(color: AppTheme.errorColor),
+                ),
+              ],
+            ),
+          ],
+
+          // Payment selection (only for delivery tab)
+          if (showPayment &&
+              order.status != AppConstants.orderStatusDelivered) ...[
+            const Divider(height: 32),
+            Text(
+              'Phương thức thanh toán:',
+              style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: AppConstants.paymentMethods.map((method) {
+                final isSelected = _selectedPaymentMethod == method;
+                return ChoiceChip(
+                  label: Text(
+                    AppConstants.paymentMethodLabels[method] ?? method,
+                  ),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() {
+                        _selectedPaymentMethod = method;
+                      });
+                    }
+                  },
+                  selectedColor: AppTheme.primaryColor.withValues(alpha: 0.2),
+                  labelStyle: TextStyle(
+                    color: isSelected
+                        ? AppTheme.primaryColor
+                        : AppTheme.textPrimary,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+
+          // Action button
+          if (actionButton != null &&
+              order.status != AppConstants.orderStatusDelivered) ...[
+            const SizedBox(height: 24),
+            Center(child: actionButton),
+          ],
+
+          // Already delivered message
+          if (order.status == AppConstants.orderStatusDelivered)
+            Container(
+              margin: const EdgeInsets.only(top: 24),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.successColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.successColor),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle,
+                    color: AppTheme.successColor,
+                    size: 32,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Đơn hàng đã hoàn thành',
+                          style: AppTheme.bodyLarge.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.successColor,
+                          ),
+                        ),
+                        if (order.completedDate != null)
+                          Text(
+                            'Giao ngày: ${DateFormat('dd/MM/yyyy HH:mm').format(order.completedDate!)}',
+                            style: AppTheme.bodySmall.copyWith(
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            ],
-
-            // Payment selection (only for delivery tab)
-            if (showPayment &&
-                order.status != AppConstants.orderStatusDelivered) ...[
-              const Divider(height: 32),
-              Text(
-                'Phương thức thanh toán:',
-                style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: AppConstants.paymentMethods.map((method) {
-                  final isSelected = _selectedPaymentMethod == method;
-                  return ChoiceChip(
-                    label: Text(
-                      AppConstants.paymentMethodLabels[method] ?? method,
-                    ),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() {
-                          _selectedPaymentMethod = method;
-                        });
-                      }
-                    },
-                    selectedColor: AppTheme.primaryColor.withValues(alpha: 0.2),
-                    labelStyle: TextStyle(
-                      color: isSelected
-                          ? AppTheme.primaryColor
-                          : AppTheme.textPrimary,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-
-            // Action button
-            if (actionButton != null &&
-                order.status != AppConstants.orderStatusDelivered) ...[
-              const SizedBox(height: 24),
-              Center(child: actionButton),
-            ],
-
-            // Already delivered message
-            if (order.status == AppConstants.orderStatusDelivered)
-              Container(
-                margin: const EdgeInsets.only(top: 24),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.successColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.successColor),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      color: AppTheme.successColor,
-                      size: 32,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Đơn hàng đã hoàn thành',
-                            style: AppTheme.bodyLarge.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.successColor,
-                            ),
-                          ),
-                          if (order.completedDate != null)
-                            Text(
-                              'Giao ngày: ${DateFormat('dd/MM/yyyy HH:mm').format(order.completedDate!)}',
-                              style: AppTheme.bodySmall.copyWith(
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
+  }
+
+  double remainingAmount(Order order) {
+    return order.totalAmount - order.paidAmount;
   }
 }

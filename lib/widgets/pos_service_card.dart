@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/service.dart';
+import '../config/theme.dart';
 
 /// Card dịch vụ cho POS - thiết kế touch-friendly
 class POSServiceCard extends StatelessWidget {
@@ -44,7 +45,10 @@ class POSServiceCard extends StatelessWidget {
             ? LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [const Color(0xFF1565C0), const Color(0xFF1976D2)],
+                colors: [
+                  AppTheme.primaryColor,
+                  AppTheme.primaryColor.withValues(alpha: 0.8),
+                ],
               )
             : null,
         color: isSelected ? null : Colors.white,
@@ -52,7 +56,7 @@ class POSServiceCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: isSelected
-                ? const Color(0xFF1565C0).withValues(alpha: 0.4)
+                ? AppTheme.primaryColor.withValues(alpha: 0.4)
                 : Colors.black.withValues(alpha: 0.08),
             blurRadius: isSelected ? 16 : 8,
             offset: const Offset(0, 4),
@@ -80,13 +84,13 @@ class POSServiceCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isSelected
                         ? Colors.white.withValues(alpha: 0.2)
-                        : const Color(0xFF1565C0).withValues(alpha: 0.1),
+                        : AppTheme.primaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
                     serviceIcon,
                     size: 32,
-                    color: isSelected ? Colors.white : const Color(0xFF1565C0),
+                    color: isSelected ? Colors.white : AppTheme.primaryColor,
                   ),
                 ),
 
@@ -98,7 +102,7 @@ class POSServiceCard extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
-                    color: isSelected ? Colors.white : Colors.grey[800],
+                    color: isSelected ? Colors.white : AppTheme.textPrimary,
                   ),
                   textAlign: TextAlign.center,
                   maxLines: 2,
@@ -115,7 +119,7 @@ class POSServiceCard extends StatelessWidget {
                     fontSize: 16,
                     color: isSelected
                         ? Colors.white.withValues(alpha: 0.9)
-                        : const Color(0xFF1565C0),
+                        : AppTheme.primaryColor,
                   ),
                 ),
 
@@ -134,7 +138,7 @@ class POSServiceCard extends StatelessWidget {
                         _QuantityButton(
                           icon: Icons.remove,
                           onTap: onDecrement,
-                          color: Colors.red[400]!,
+                          color: AppTheme.errorColor,
                         ),
                         // Quantity
                         Container(
@@ -142,10 +146,10 @@ class POSServiceCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Text(
                             '$quantity',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1565C0),
+                              color: AppTheme.primaryColor,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -154,7 +158,7 @@ class POSServiceCard extends StatelessWidget {
                         _QuantityButton(
                           icon: Icons.add,
                           onTap: onIncrement,
-                          color: const Color(0xFF4CAF50),
+                          color: AppTheme.successColor,
                         ),
                       ],
                     ),

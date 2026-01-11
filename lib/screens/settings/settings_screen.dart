@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
@@ -15,7 +14,11 @@ import '../../models/customer.dart';
 import '../../config/constants.dart';
 import '../../config/theme.dart';
 import '../../core/services/backup_service.dart';
-import '../../widgets/main_layout.dart';
+import '../../widgets/layouts/desktop_layout.dart';
+import '../../widgets/ui/cards.dart';
+import '../../widgets/ui/buttons.dart';
+import '../../widgets/ui/inputs.dart';
+import '../../widgets/ui/dialogs.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -55,15 +58,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadCurrentUser() async {
-    // ... existing load profile code ...
     try {
       final userId = AuthService.instance.currentUser?.id;
       if (userId != null) {
         final user = await _userRepo.getById(userId);
         if (mounted) {
-            setState(() {
+          setState(() {
             _currentUser = user;
-            });
+          });
         }
       }
     } catch (e) {
@@ -78,17 +80,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _storeNameController.text = prefs.getString('store_name') ?? '';
         _storeAddressController.text = prefs.getString('store_address') ?? '';
         _storePhoneController.text = prefs.getString('store_phone') ?? '';
-        _footerMessageController.text = prefs.getString('print_footer_message') ?? '';
+        _footerMessageController.text =
+            prefs.getString('print_footer_message') ?? '';
         _selectedPaperSize = prefs.getString('print_paper_size') ?? 'roll80';
         _autoPrint = prefs.getBool('print_auto') ?? false;
         _autoBackup = prefs.getBool('auto_backup') ?? false;
-        
-        // Only stop loading if profile is also loaded. 
-        // But for simplicity, we can rely on parallel execution
+
         _isLoading = false;
       });
     } catch (e) {
-      // print('Error loading settings: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -99,7 +99,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await prefs.setString('store_name', _storeNameController.text);
       await prefs.setString('store_address', _storeAddressController.text);
       await prefs.setString('store_phone', _storePhoneController.text);
-      await prefs.setString('print_footer_message', _footerMessageController.text);
+      await prefs.setString(
+        'print_footer_message',
+        _footerMessageController.text,
+      );
       await prefs.setString('print_paper_size', _selectedPaperSize);
       await prefs.setBool('print_auto', _autoPrint);
 
@@ -114,12 +117,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi khi lưu: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
+        showAppAlertDialog(context, title: 'Lỗi', content: 'Lỗi khi lưu: $e');
       }
     }
   }
@@ -128,15 +126,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final result = await FilePicker.platform.saveFile(
         dialogTitle: 'Chọn vị trí lưu backup',
-        fileName: 'laundry_backup_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.db',
+        fileName:
+            'laundry_backup_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.db',
         type: FileType.custom,
         allowedExtensions: ['db'],
       );
 
       if (result != null) {
-        // Copy database to selected location
         await BackupService.instance.backupDatabase(result);
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -158,39 +156,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi sao lưu: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
+        showAppAlertDialog(context, title: 'Lỗi', content: 'Lỗi sao lưu: $e');
       }
     }
   }
 
   Future<void> _restoreDatabase() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xác nhận khôi phục'),
-        content: const Text(
-          'Khôi phục sẽ thay thế toàn bộ dữ liệu hiện tại. '
-          'Bạn có chắc chắn muốn tiếp tục?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
-            ),
-            child: const Text('Khôi phục'),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Xác nhận khôi phục',
+      content:
+          'Khôi phục sẽ thay thế toàn bộ dữ liệu hiện tại. Bạn có chắc chắn muốn tiếp tục?',
+      confirmText: 'Khôi phục',
+      confirmColor: AppTheme.errorColor,
     );
 
     if (confirmed != true) return;
@@ -202,9 +180,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         allowedExtensions: ['db'],
       );
 
-        if (result != null && result.files.single.path != null) {
+      if (result != null && result.files.single.path != null) {
         await BackupService.instance.restoreDatabase(result.files.single.path!);
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -224,12 +202,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi khôi phục: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
+        showAppAlertDialog(context, title: 'Lỗi', content: 'Lỗi khôi phục: $e');
       }
     }
   }
@@ -257,20 +230,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     final dummyItems = [
-      {'service_name': 'Giặt sấy', 'quantity': 5, 'unit_price': 15000.0, 'subtotal': 75000.0},
-      {'service_name': 'Ủi đồ', 'quantity': 3, 'unit_price': 25000.0, 'subtotal': 75000.0},
+      {
+        'service_name': 'Giặt sấy',
+        'quantity': 5,
+        'unit_price': 15000.0,
+        'subtotal': 75000.0,
+      },
+      {
+        'service_name': 'Ủi đồ',
+        'quantity': 3,
+        'unit_price': 25000.0,
+        'subtotal': 75000.0,
+      },
     ];
 
     final storeName = _storeNameController.text;
     final storeAddress = _storeAddressController.text;
     final storePhone = _storePhoneController.text;
     final footerMessage = _footerMessageController.text;
-    
+
     PdfPageFormat format;
     switch (_selectedPaperSize) {
-      case 'a4': format = PdfPageFormat.a4; break;
-      case 'a5': format = PdfPageFormat.a5; break;
-      default: format = PdfPageFormat.roll80;
+      case 'a4':
+        format = PdfPageFormat.a4;
+        break;
+      case 'a5':
+        format = PdfPageFormat.a5;
+        break;
+      default:
+        format = PdfPageFormat.roll80;
     }
 
     try {
@@ -279,36 +267,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context: context,
           builder: (context) => Dialog(
             insetPadding: const EdgeInsets.all(24),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: Column(
               children: [
                 AppBar(
                   title: const Text('Xem trước mẫu in'),
                   shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
                   ),
                   leading: IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   actions: [
-                    // Nút in ngay từ preview
                     IconButton(
                       icon: const Icon(Icons.print),
                       tooltip: 'In ngay',
                       onPressed: () async {
                         await Printing.layoutPdf(
-                          onLayout: (format) async => await PrintService.instance.generateOrderReceipt(
-                            dummyOrder,
-                            dummyCustomer,
-                            dummyItems,
-                            storeName.isEmpty ? 'Tên Cửa Hàng Demo' : storeName,
-                            'Admin (Preview)',
-                            storeAddress: storeAddress.isEmpty ? 'Địa chỉ Demo' : storeAddress,
-                            storePhone: storePhone.isEmpty ? '0909000000' : storePhone,
-                            footerMessage: footerMessage.isEmpty ? 'Cảm ơn quý khách!' : footerMessage,
-                            pageFormat: format,
-                          ),
+                          onLayout: (format) async =>
+                              await PrintService.instance.generateOrderReceipt(
+                                dummyOrder,
+                                dummyCustomer,
+                                dummyItems,
+                                storeName.isEmpty
+                                    ? 'Tên Cửa Hàng Demo'
+                                    : storeName,
+                                'Admin (Preview)',
+                                storeAddress: storeAddress.isEmpty
+                                    ? 'Địa chỉ Demo'
+                                    : storeAddress,
+                                storePhone: storePhone.isEmpty
+                                    ? '0909000000'
+                                    : storePhone,
+                                footerMessage: footerMessage.isEmpty
+                                    ? 'Cảm ơn quý khách!'
+                                    : footerMessage,
+                                pageFormat: format,
+                              ),
                         );
                       },
                     ),
@@ -317,23 +317,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Expanded(
                   child: PdfPreview(
                     build: (pageFormat) async {
-                      // Sử dụng format được truyền vào (nếu user đổi trong preview) hoặc format mặc định
                       return PrintService.instance.generateOrderReceipt(
                         dummyOrder,
                         dummyCustomer,
                         dummyItems,
                         storeName.isEmpty ? 'Tên Cửa Hàng Demo' : storeName,
                         'Admin (Preview)',
-                        storeAddress: storeAddress.isEmpty ? 'Địa chỉ Demo' : storeAddress,
-                        storePhone: storePhone.isEmpty ? '0909000000' : storePhone,
-                        footerMessage: footerMessage.isEmpty ? 'Cảm ơn quý khách!' : footerMessage,
-                        pageFormat: pageFormat, // Use dynamic format logic if needed or stick to strict format
+                        storeAddress: storeAddress.isEmpty
+                            ? 'Địa chỉ Demo'
+                            : storeAddress,
+                        storePhone: storePhone.isEmpty
+                            ? '0909000000'
+                            : storePhone,
+                        footerMessage: footerMessage.isEmpty
+                            ? 'Cảm ơn quý khách!'
+                            : footerMessage,
+                        pageFormat: pageFormat,
                       );
                     },
-                    initialPageFormat: format, // Set khổ giấy ban đầu theo config
-                    canChangeOrientation: false, // Receipt thường không xoay ngang
+                    initialPageFormat: format,
+                    canChangeOrientation: false,
                     canDebug: false,
-                    useActions: false, // Ẩn toolbar mặc định để dùng custom toolbar hoặc tối giản
+                    useActions: false,
                     scrollViewDecoration: BoxDecoration(
                       color: Colors.grey[100],
                     ),
@@ -346,12 +351,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi xem trước: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
+        showAppAlertDialog(context, title: 'Lỗi', content: 'Lỗi xem trước: $e');
       }
     }
   }
@@ -365,132 +365,86 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
-          width: 400,
+          width: 500,
           padding: const EdgeInsets.all(32),
           child: Form(
             key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.lock_reset,
-                        color: AppTheme.primaryColor,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      'Đổi mật khẩu',
-                      style: AppTheme.heading3.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                
-                TextFormField(
-                  controller: currentPasswordController,
-                  decoration: InputDecoration(
-                    labelText: 'Mật khẩu hiện tại *',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                    prefixIcon: const Icon(Icons.lock_outline),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Đổi mật khẩu', style: AppTheme.heading2),
+                  const SizedBox(height: 24),
+
+                  AppTextField(
+                    controller: currentPasswordController,
+                    label: 'Mật khẩu hiện tại *',
+                    obscureText: true,
+                    prefixIcon: Icons.lock_outline,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Vui lòng nhập mật khẩu hiện tại';
+                      }
+                      return null;
+                    },
                   ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Vui lòng nhập mật khẩu hiện tại';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                
-                TextFormField(
-                  controller: newPasswordController,
-                  decoration: InputDecoration(
-                    labelText: 'Mật khẩu mới *',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                    prefixIcon: const Icon(Icons.lock),
+                  const SizedBox(height: 16),
+
+                  AppTextField(
+                    controller: newPasswordController,
+                    label: 'Mật khẩu mới *',
+                    obscureText: true,
+                    prefixIcon: Icons.lock,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Vui lòng nhập mật khẩu mới';
+                      }
+                      if (value.length < 6) {
+                        return 'Mật khẩu phải có ít nhất 6 ký tự';
+                      }
+                      return null;
+                    },
                   ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Vui lòng nhập mật khẩu mới';
-                    }
-                    if (value.length < 6) {
-                      return 'Mật khẩu phải có ít nhất 6 ký tự';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                
-                TextFormField(
-                  controller: confirmPasswordController,
-                  decoration: InputDecoration(
-                    labelText: 'Xác nhận mật khẩu *',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                    prefixIcon: const Icon(Icons.lock),
+                  const SizedBox(height: 16),
+
+                  AppTextField(
+                    controller: confirmPasswordController,
+                    label: 'Xác nhận mật khẩu *',
+                    obscureText: true,
+                    prefixIcon: Icons.lock,
+                    validator: (value) {
+                      if (value != newPasswordController.text) {
+                        return 'Mật khẩu không khớp';
+                      }
+                      return null;
+                    },
                   ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value != newPasswordController.text) {
-                      return 'Mật khẩu không khớp';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-                
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
+                  const SizedBox(height: 32),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      SecondaryButton(
                         onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('Hủy'),
+                        label: 'Hủy',
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton(
+                      const SizedBox(width: 16),
+                      PrimaryButton(
                         onPressed: () {
                           if (formKey.currentState!.validate()) {
                             Navigator.of(context).pop(true);
                           }
                         },
-                        child: const Text('Đổi mật khẩu'),
+                        label: 'Đổi mật khẩu',
+                        icon: Icons.save,
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -499,67 +453,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (result == true && _currentUser != null) {
       try {
-        // Verify current password by hashing and comparing
-        final currentHash = AuthService.instance.hashPasswordPublic(currentPasswordController.text);
-        
+        final currentHash = AuthService.instance.hashPasswordPublic(
+          currentPasswordController.text,
+        );
+
         if (currentHash != _currentUser!.passwordHash) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Mật khẩu hiện tại không đúng'),
-                backgroundColor: AppTheme.errorColor,
-              ),
+            showAppAlertDialog(
+              context,
+              title: 'Lỗi',
+              content: 'Mật khẩu hiện tại không đúng',
+              buttonText: 'Thử lại',
             );
           }
           return;
         }
 
-        // Update password
         final updatedUser = _currentUser!.copyWith(
-          passwordHash: AuthService.instance.hashPasswordPublic(newPasswordController.text),
+          passwordHash: AuthService.instance.hashPasswordPublic(
+            newPasswordController.text,
+          ),
         );
         await _userRepo.update(updatedUser);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.white),
-                  SizedBox(width: 12),
-                  Text('Đã đổi mật khẩu thành công'),
-                ],
-              ),
+              content: Text('Đã đổi mật khẩu thành công'),
               backgroundColor: AppTheme.successColor,
-              behavior: SnackBarBehavior.floating,
             ),
           );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Lỗi: $e'),
-              backgroundColor: AppTheme.errorColor,
-            ),
-          );
+          showAppAlertDialog(context, title: 'Lỗi', content: 'Lỗi: $e');
         }
       }
     }
-
-    currentPasswordController.dispose();
-    newPasswordController.dispose();
-    confirmPasswordController.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return MainLayout(
+    return DesktopLayout(
       title: 'Cài đặt',
       child: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -567,21 +506,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Thông tin tài khoản',
                     icon: Icons.person,
                     children: [
-                      _buildInfoRow('Tên đăng nhập', _currentUser?.username ?? '-'),
+                      _buildInfoRow(
+                        'Tên đăng nhập',
+                        _currentUser?.username ?? '-',
+                      ),
                       _buildInfoRow('Họ tên', _currentUser?.fullName ?? '-'),
                       _buildInfoRow('Vai trò', _currentUser?.role ?? '-'),
                       _buildInfoRow('Email', _currentUser?.email ?? '-'),
                       const SizedBox(height: 16),
-                      ElevatedButton.icon(
+                      PrimaryButton(
                         onPressed: _showChangePasswordDialog,
-                        icon: const Icon(Icons.lock_reset),
-                        label: const Text('Đổi mật khẩu'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                        ),
+                        icon: Icons.lock_reset,
+                        label: 'Đổi mật khẩu',
                       ),
                     ],
                   ),
@@ -592,93 +528,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Cấu hình in ấn',
                     icon: Icons.print,
                     children: [
-                      _buildTextField(
+                      AppTextField(
                         controller: _storeNameController,
                         label: 'Tên cửa hàng',
-                        icon: Icons.store,
+                        prefixIcon: Icons.store,
                       ),
                       const SizedBox(height: 12),
-                      _buildTextField(
+                      AppTextField(
                         controller: _storeAddressController,
                         label: 'Địa chỉ',
-                        icon: Icons.location_on,
+                        prefixIcon: Icons.location_on,
                       ),
                       const SizedBox(height: 12),
-                      _buildTextField(
+                      AppTextField(
                         controller: _storePhoneController,
                         label: 'Số điện thoại',
-                        icon: Icons.phone,
+                        prefixIcon: Icons.phone,
                       ),
                       const SizedBox(height: 12),
-                      _buildTextField(
+                      AppTextField(
                         controller: _footerMessageController,
                         label: 'Lời chào cuối đơn',
-                        icon: Icons.text_fields,
+                        prefixIcon: Icons.text_fields,
                       ),
                       const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                Icon(Icons.format_size, color: Colors.grey[600]),
-                                const SizedBox(width: 12),
-                                Text('Khổ giấy in', style: TextStyle(fontSize: 16, color: Colors.grey[800])),
-                              ],
-                            ),
+                      AppDropdown<String>(
+                        label: 'Khổ giấy in',
+                        value: _selectedPaperSize,
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'roll80',
+                            child: Text('Khổ 80mm (K80)'),
                           ),
-                          DropdownButton<String>(
-                            value: _selectedPaperSize,
-                            items: const [
-                              DropdownMenuItem(value: 'roll80', child: Text('Khổ 80mm (K80)')),
-                              DropdownMenuItem(value: 'a4', child: Text('Khổ A4')),
-                              DropdownMenuItem(value: 'a5', child: Text('Khổ A5')),
-                            ],
-                            onChanged: (v) {
-                              if (v != null) setState(() => _selectedPaperSize = v);
-                            },
-                          ),
+                          DropdownMenuItem(value: 'a4', child: Text('Khổ A4')),
+                          DropdownMenuItem(value: 'a5', child: Text('Khổ A5')),
                         ],
+                        onChanged: (v) {
+                          if (v != null) setState(() => _selectedPaperSize = v);
+                        },
                       ),
+                      const SizedBox(height: 16),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Row(
                           children: [
                             Icon(Icons.print_outlined, color: Colors.grey[600]),
                             const SizedBox(width: 12),
-                            Text('Tự động in sau khi tạo đơn', style: TextStyle(fontSize: 16, color: Colors.grey[800])),
+                            Text(
+                              'Tự động in sau khi tạo đơn',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[800],
+                              ),
+                            ),
                           ],
                         ),
                         value: _autoPrint,
                         onChanged: (v) => setState(() => _autoPrint = v),
                       ),
                       const SizedBox(height: 16),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            OutlinedButton.icon(
-                              onPressed: _previewReceipt,
-                              icon: const Icon(Icons.visibility),
-                              label: const Text('Xem mẫu in'),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            ElevatedButton.icon(
-                              onPressed: _saveSettings,
-                              icon: const Icon(Icons.save),
-                              label: const Text('Lưu cấu hình in'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.primaryColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                              ),
-                            ),
-                          ],
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          SecondaryButton(
+                            onPressed: _previewReceipt,
+                            icon: Icons.visibility,
+                            label: 'Xem mẫu in',
+                          ),
+                          const SizedBox(width: 12),
+                          PrimaryButton(
+                            onPressed: _saveSettings,
+                            icon: Icons.save,
+                            label: 'Lưu cấu hình in',
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -698,9 +621,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 16),
                       SwitchListTile(
                         title: const Text('Sao lưu tự động hàng ngày'),
-                        subtitle: const Text('Sao lưu vào thư mục Documents/LaundryBackups'),
+                        subtitle: const Text(
+                          'Sao lưu vào thư mục Documents/LaundryBackups',
+                        ),
                         value: _autoBackup,
-                        // activeColor: AppTheme.primaryColor,
                         contentPadding: EdgeInsets.zero,
                         onChanged: (bool value) async {
                           setState(() => _autoBackup = value);
@@ -711,29 +635,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 16),
                       Row(
                         children: [
-                          ElevatedButton.icon(
+                          PrimaryButton(
                             onPressed: _backupDatabase,
-                            icon: const Icon(Icons.download),
-                            label: const Text('Sao lưu'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.successColor,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 12,
-                              ),
-                            ),
+                            icon: Icons.download,
+                            label: 'Sao lưu',
+                            backgroundColor: AppTheme.successColor,
                           ),
                           const SizedBox(width: 12),
-                          OutlinedButton.icon(
+                          SecondaryButton(
                             onPressed: _restoreDatabase,
-                            icon: const Icon(Icons.upload),
-                            label: const Text('Khôi phục'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 12,
-                              ),
-                            ),
+                            icon: Icons.upload,
+                            label: 'Khôi phục',
                           ),
                         ],
                       ),
@@ -746,7 +658,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Thông tin ứng dụng',
                     icon: Icons.info,
                     children: [
-                      _buildInfoRow('Tên ứng dụng', 'Laundry Management System'),
+                      _buildInfoRow(
+                        'Tên ứng dụng',
+                        'Laundry Management System',
+                      ),
                       _buildInfoRow('Phiên bản', '1.0.0'),
                       _buildInfoRow('Nền tảng', 'Flutter Desktop (Windows)'),
                       _buildInfoRow('Database', 'SQLite'),
@@ -789,23 +704,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               'Xuất báo cáo Excel',
                               'Thu chi tài chính',
                               'Sao lưu & Khôi phục',
-                            ].map((feature) => Padding(
-                              padding: const EdgeInsets.only(bottom: 4),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.check,
-                                    color: AppTheme.successColor,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    feature,
-                                    style: AppTheme.bodySmall,
-                                  ),
-                                ],
+                            ].map(
+                              (feature) => Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.check,
+                                      color: AppTheme.successColor,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(feature, style: AppTheme.bodySmall),
+                                  ],
+                                ),
                               ),
-                            )),
+                            ),
                           ],
                         ),
                       ),
@@ -843,35 +757,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required IconData icon,
     required List<Widget> children,
   }) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, color: AppTheme.primaryColor, size: 24),
+    return AppCard(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: AppTheme.heading3.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 32),
-            ...children,
-          ],
-        ),
+                child: Icon(icon, color: AppTheme.primaryColor, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: AppTheme.heading3.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const Divider(height: 32),
+          ...children,
+        ],
       ),
     );
   }
@@ -893,31 +803,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Expanded(
             child: Text(
               value,
-              style: AppTheme.bodyMedium.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: AppTheme.bodyMedium.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
         ],
-      ),
-    );
-  }
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-  }) {
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        filled: true,
-        fillColor: Colors.grey[50],
-        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       ),
     );
   }

@@ -4,8 +4,11 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../repositories/transaction_repository.dart';
 import '../../models/transaction.dart';
 import '../../config/theme.dart';
-import '../../widgets/main_layout.dart';
-import '../../widgets/common_dialogs.dart';
+import '../../widgets/layouts/desktop_layout.dart';
+import '../../widgets/ui/cards.dart';
+import '../../widgets/ui/buttons.dart';
+import '../../widgets/ui/inputs.dart';
+import '../../widgets/ui/dialogs.dart';
 
 class TransactionListScreen extends StatefulWidget {
   const TransactionListScreen({super.key});
@@ -16,14 +19,14 @@ class TransactionListScreen extends StatefulWidget {
 
 class _TransactionListScreenState extends State<TransactionListScreen> {
   final _transactionRepo = TransactionRepository();
-  
+
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _endDate = DateTime.now();
-  
+
   Map<String, double> _summary = {'income': 0, 'expense': 0, 'balance': 0};
   List<Transaction> _transactions = [];
   bool _isLoading = true;
-  
+
   // Form State
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
@@ -32,10 +35,16 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
   String? _selectedCategory;
   DateTime _selectedDate = DateTime.now();
   bool _isSubmitting = false;
-  int _dropdownKey = 0;
+  // int _dropdownKey = 0; // Removed as we can control state better
 
   final List<String> _incomeCategories = ['Bán hàng', 'Dịch vụ', 'Khác'];
-  final List<String> _expenseCategories = ['Nhập hàng', 'Điện nước', 'Lương nhân viên', 'Mặt bằng', 'Khác'];
+  final List<String> _expenseCategories = [
+    'Nhập hàng',
+    'Điện nước',
+    'Lương nhân viên',
+    'Mặt bằng',
+    'Khác',
+  ];
 
   @override
   void initState() {
@@ -46,9 +55,15 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final summary = await _transactionRepo.getSummary(startDate: _startDate, endDate: _endDate);
-      final transactions = await _transactionRepo.getAll(startDate: _startDate, endDate: _endDate);
-      
+      final summary = await _transactionRepo.getSummary(
+        startDate: _startDate,
+        endDate: _endDate,
+      );
+      final transactions = await _transactionRepo.getAll(
+        startDate: _startDate,
+        endDate: _endDate,
+      );
+
       setState(() {
         _summary = summary;
         _transactions = transactions;
@@ -57,7 +72,11 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi tải dữ liệu: $e')));
+        showAppAlertDialog(
+          context,
+          title: 'Lỗi',
+          content: 'Lỗi tải dữ liệu: $e',
+        );
       }
     }
   }
@@ -65,149 +84,181 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
   Future<void> _submitTransaction() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng chọn danh mục')));
+      showAppAlertDialog(
+        context,
+        title: 'Thiếu thông tin',
+        content: 'Vui lòng chọn danh mục',
+      );
       return;
     }
 
     setState(() => _isSubmitting = true);
-    
+
     try {
-      final amount = double.parse(_amountController.text.replaceAll('.', '').replaceAll(',', ''));
-      
+      final amount =
+          double.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
+
       final transaction = Transaction(
         type: _selectedType,
         category: _selectedCategory!,
         amount: amount,
         description: _descController.text,
-        userId: 1, // Hardcoded for now, should come from Auth
+        userId: 1, // Hardcoded for now
         transactionDate: _selectedDate,
       );
-      
+
       await _transactionRepo.create(transaction);
-      
+
       // Reset form
       _amountController.clear();
       _descController.clear();
       setState(() {
         _selectedDate = DateTime.now();
         _selectedCategory = null;
-        _dropdownKey++;
+        // _dropdownKey++;
       });
-      
+
       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Đã lưu giao dịch ${_selectedType == 'income' ? 'Thu' : 'Chi'}'), backgroundColor: AppTheme.successColor),
-         );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Đã lưu giao dịch ${_selectedType == 'income' ? 'Thu' : 'Chi'}',
+            ),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
       }
-      
+
       await _loadData();
     } catch (e) {
-       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi lưu: $e'), backgroundColor: AppTheme.errorColor));
-       }
+      if (mounted) {
+        showAppAlertDialog(context, title: 'Lỗi', content: 'Lỗi lưu: $e');
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
   Future<void> _deleteTransaction(Transaction t) async {
-     final confirm = await CommonDialogs.showDeleteConfirmation(context, title: 'Xóa giao dịch', content: 'Bạn có chắc chắn muốn xóa giao dịch này?');
-     if (confirm) {
-       await _transactionRepo.delete(t.id!);
-       _loadData();
-     }
+    final confirm = await showAppConfirmDialog(
+      context,
+      title: 'Xóa giao dịch',
+      content:
+          'Bạn có chắc chắn muốn xóa giao dịch này? Hành động này không thể hoàn tác.',
+      confirmText: 'Xóa',
+      confirmColor: AppTheme.errorColor,
+    );
+    if (confirm == true) {
+      await _transactionRepo.delete(t.id!);
+      _loadData();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return MainLayout(
+    return DesktopLayout(
       title: 'Quản lý Thu Chi',
-      child: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(),
-                const SizedBox(height: 24),
-                _buildStatsRow(),
-                const SizedBox(height: 24),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    if (constraints.maxWidth > 900) {
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(flex: 2, child: _buildChartSection()),
-                          const SizedBox(width: 24),
-                          Expanded(flex: 1, child: _buildQuickAddForm()),
-                        ],
-                      );
-                    } else {
-                      return Column(
-                        children: [
-                          _buildChartSection(),
-                          const SizedBox(height: 24),
-                          _buildQuickAddForm(),
-                        ],
-                      );
-                    }
-                  },
-                ),
-                const SizedBox(height: 24),
-                _buildTransactionList(),
-              ],
-            ),
-          ),
-    );
-  }
-  
-  Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Theo dõi dòng tiền và hiệu quả kinh doanh', style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary)),
-          ],
-        ),
-        OutlinedButton.icon(
+      actions: [
+        SecondaryButton(
           onPressed: () async {
-             final picked = await showDateRangePicker(context: context, firstDate: DateTime(2020), lastDate: DateTime.now(), initialDateRange: DateTimeRange(start: _startDate, end: _endDate));
-             if (picked != null) {
-               setState(() { _startDate = picked.start; _endDate = picked.end; });
-               _loadData();
-             }
+            final picked = await showDateRangePicker(
+              context: context,
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now(),
+              initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
+            );
+            if (picked != null) {
+              setState(() {
+                _startDate = picked.start;
+                _endDate = picked.end;
+              });
+              _loadData();
+            }
           },
-          icon: const Icon(Icons.calendar_today, size: 16),
-          label: Text('${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}'),
-        )
+          icon: Icons.calendar_today,
+          label:
+              '${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}',
+        ),
       ],
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildStatsRow(),
+                  const SizedBox(height: 24),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth > 1000) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(flex: 2, child: _buildChartSection()),
+                            const SizedBox(width: 24),
+                            Expanded(flex: 1, child: _buildQuickAddForm()),
+                          ],
+                        );
+                      } else {
+                        return Column(
+                          children: [
+                            _buildChartSection(),
+                            const SizedBox(height: 24),
+                            _buildQuickAddForm(),
+                          ],
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  _buildTransactionList(),
+                ],
+              ),
+            ),
     );
   }
 
   Widget _buildStatsRow() {
     return Row(
       children: [
-        Expanded(child: _buildStatCard('Tổng Thu', _summary['income']!, Icons.arrow_upward, Colors.green)),
+        Expanded(
+          child: _buildStatCard(
+            'Tổng Thu',
+            _summary['income']!,
+            Icons.arrow_upward,
+            Colors.green,
+          ),
+        ),
         const SizedBox(width: 16),
-        Expanded(child: _buildStatCard('Tổng Chi', _summary['expense']!, Icons.arrow_downward, Colors.red)),
+        Expanded(
+          child: _buildStatCard(
+            'Tổng Chi',
+            _summary['expense']!,
+            Icons.arrow_downward,
+            Colors.red,
+          ),
+        ),
         const SizedBox(width: 16),
-        Expanded(child: _buildStatCard('Lợi Nhuận Ròng', _summary['balance']!, Icons.account_balance_wallet, Colors.blue)),
+        Expanded(
+          child: _buildStatCard(
+            'Lợi Nhuận Ròng',
+            _summary['balance']!,
+            Icons.account_balance_wallet,
+            Colors.blue,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildStatCard(String title, double value, IconData icon, Color color) {
-    return Container(
+  Widget _buildStatCard(
+    String title,
+    double value,
+    IconData icon,
+    Color color,
+  ) {
+    return AppCard(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -215,17 +266,34 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 child: Icon(icon, color: color, size: 20),
               ),
               const SizedBox(width: 12),
-              Text(title, style: TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
+              Text(
+                title,
+                style: TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
           Text(
-            NumberFormat.currency(locale: 'vi', symbol: 'đ', decimalDigits: 0).format(value),
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color),
+            NumberFormat.currency(
+              locale: 'vi',
+              symbol: 'đ',
+              decimalDigits: 0,
+            ).format(value),
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
         ],
       ),
@@ -234,44 +302,57 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
 
   List<BarChartGroupData> _getChartData() {
     if (_transactions.isEmpty) return [];
-    
+
     // Group by month (last 6 months)
     final now = DateTime.now();
-    final months = List.generate(6, (i) => DateTime(now.year, now.month - 5 + i, 1));
-    
+    final months = List.generate(
+      6,
+      (i) => DateTime(now.year, now.month - 5 + i, 1),
+    );
+
     return months.asMap().entries.map((entry) {
       final monthStart = entry.value;
       final monthEnd = DateTime(monthStart.year, monthStart.month + 1, 0);
-      
+
       double income = 0;
       double expense = 0;
-      
+
       for (var t in _transactions) {
-        if (t.transactionDate.isAfter(monthStart.subtract(const Duration(days: 1))) && 
+        if (t.transactionDate.isAfter(
+              monthStart.subtract(const Duration(days: 1)),
+            ) &&
             t.transactionDate.isBefore(monthEnd.add(const Duration(days: 1)))) {
-           if (t.type == 'income') {
-             income += t.amount;
-           } else {
-             expense += t.amount;
-           }
+          if (t.type == 'income') {
+            income += t.amount;
+          } else {
+            expense += t.amount;
+          }
         }
       }
-      
-      return BarChartGroupData(x: entry.key, barRods: [
-        BarChartRodData(toY: income, color: Colors.green, width: 12, borderRadius: BorderRadius.circular(4)),
-        BarChartRodData(toY: expense, color: Colors.red, width: 12, borderRadius: BorderRadius.circular(4)),
-      ]);
+
+      return BarChartGroupData(
+        x: entry.key,
+        barRods: [
+          BarChartRodData(
+            toY: income,
+            color: Colors.green,
+            width: 12,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          BarChartRodData(
+            toY: expense,
+            color: Colors.red,
+            width: 12,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ],
+      );
     }).toList();
   }
 
   Widget _buildChartSection() {
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -283,163 +364,84 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                    child: const Icon(Icons.analytics_outlined, color: Colors.blue),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.analytics_outlined,
+                      color: Colors.blue,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Báo cáo Tài Chính', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text('Phân tích hiệu quả kinh doanh & Xuất dữ liệu', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                      const Text(
+                        'Báo cáo Tài Chính',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Phân tích hiệu quả kinh doanh',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
                     ],
                   ),
                 ],
               ),
+              // Simplified header actions
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Filters (Simplified for now - kept visual placeholders or removed if unused logic)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
               Row(
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.picture_as_pdf, size: 16, color: Colors.red),
-                    label: const Text('Xuất PDF', style: TextStyle(color: Colors.black87)),
-                    style: OutlinedButton.styleFrom(side: BorderSide(color: Colors.grey.shade300)),
+                  Icon(Icons.circle, color: Colors.green, size: 10),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Thu nhập',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.table_view, size: 16, color: Colors.green),
-                    label: const Text('Xuất Excel', style: TextStyle(color: Colors.black87)),
-                     style: OutlinedButton.styleFrom(side: BorderSide(color: Colors.grey.shade300)),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const Divider(),
-          const SizedBox(height: 24),
-          
-          // Filters
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Khoảng thời gian', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 12)),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: 'Theo Tháng',
-                          isExpanded: true,
-                          items: ['Theo Tháng', 'Theo Quý', 'Theo Năm'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                          onChanged: (_) {},
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Loại báo cáo', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 12)),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: 'Báo cáo Lãi Lỗ',
-                          isExpanded: true,
-                          items: ['Báo cáo Lãi Lỗ', 'Báo cáo Thu Nhập', 'Báo cáo Chi phí'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                          onChanged: (_) {},
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Chọn khoảng', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 12)),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: () async {
-                         final picked = await showDateRangePicker(context: context, firstDate: DateTime(2020), lastDate: DateTime.now(), initialDateRange: DateTimeRange(start: _startDate, end: _endDate));
-                         if (picked != null) {
-                           setState(() { _startDate = picked.start; _endDate = picked.end; });
-                           _loadData();
-                         }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(DateFormat('MM/yyyy').format(_startDate), style: const TextStyle(fontSize: 14)),
-                            const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-               const SizedBox(width: 16),
-               Padding(
-                 padding: const EdgeInsets.only(top: 24),
-                 child: ElevatedButton(
-                   onPressed: _loadData,
-                   style: ElevatedButton.styleFrom(
-                     backgroundColor: const Color(0xFF1976D2),
-                     foregroundColor: Colors.white,
-                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20), // Match height of inputs
-                   ),
-                   child: const Text('Xem'),
-                 ),
-               ),
-            ],
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Chart Title & Legend
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-               const Text('Biểu đồ Lãi Lỗ (6 tháng gần nhất)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-               Row(
-                children: [
-                  Icon(Icons.circle, color: Colors.green, size: 10), const SizedBox(width: 4), const Text('Thu nhập', style: TextStyle(fontSize: 12, color: Colors.grey)),
                   const SizedBox(width: 16),
-                  Icon(Icons.circle, color: Colors.red, size: 10), const SizedBox(width: 4), const Text('Chi phí', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  Icon(Icons.circle, color: Colors.red, size: 10),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Chi phí',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                 ],
-              )
+              ),
             ],
           ),
+
           const SizedBox(height: 24),
-          
+
           // Chart
           SizedBox(
             height: 350,
             child: BarChart(
               BarChartData(
-                gridData: FlGridData(show: false),
+                gridData: const FlGridData(show: false),
                 titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
@@ -449,8 +451,17 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                         int displayMonth = monthIndex;
                         if (displayMonth <= 0) displayMonth += 12;
                         if (displayMonth > 12) displayMonth -= 12;
-                        
-                        return Padding(padding: const EdgeInsets.only(top: 8), child: Text('T$displayMonth', style: const TextStyle(fontSize: 12, color: Colors.grey)));
+
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'T$displayMonth',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        );
                       },
                     ),
                   ),
@@ -459,13 +470,19 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                 barGroups: _getChartData(),
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
-                     tooltipBgColor: Colors.black87,
-                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                       return BarTooltipItem(
-                         NumberFormat.currency(locale: 'vi', symbol: 'đ', decimalDigits: 0).format(rod.toY),
-                         const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                       );
-                     }
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      return BarTooltipItem(
+                        NumberFormat.currency(
+                          locale: 'vi',
+                          symbol: 'đ',
+                          decimalDigits: 0,
+                        ).format(rod.toY),
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -477,13 +494,8 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
   }
 
   Widget _buildQuickAddForm() {
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
-      ),
       child: Form(
         key: _formKey,
         child: Column(
@@ -492,15 +504,25 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Ghi nhận Giao dịch', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(Icons.refresh, size: 20), onPressed: () {
-                  _amountController.clear(); _descController.clear();
-                }),
+                const Text(
+                  'Ghi nhận Giao dịch',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 20),
+                  onPressed: () {
+                    _amountController.clear();
+                    _descController.clear();
+                  },
+                ),
               ],
             ),
             const SizedBox(height: 24),
             Container(
-              decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Row(
                 children: [
                   Expanded(
@@ -509,11 +531,34 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: _selectedType == 'income' ? Colors.white : Colors.transparent,
+                          color: _selectedType == 'income'
+                              ? Colors.white
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
-                          boxShadow: _selectedType == 'income' ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)] : [],
+                          boxShadow: _selectedType == 'income'
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 4,
+                                  ),
+                                ]
+                              : [],
                         ),
-                        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: const [Icon(Icons.add_circle, color: Colors.green, size: 16), SizedBox(width: 8), Text('Thu nhập', style: TextStyle(fontWeight: FontWeight.bold))]),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(
+                              Icons.add_circle,
+                              color: Colors.green,
+                              size: 16,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Thu nhập',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -523,11 +568,34 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: _selectedType == 'expense' ? Colors.white : Colors.transparent,
+                          color: _selectedType == 'expense'
+                              ? Colors.white
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
-                          boxShadow: _selectedType == 'expense' ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)] : [],
+                          boxShadow: _selectedType == 'expense'
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 4,
+                                  ),
+                                ]
+                              : [],
                         ),
-                         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: const [Icon(Icons.remove_circle, color: Colors.red, size: 16), SizedBox(width: 8), Text('Chi phí', style: TextStyle(fontWeight: FontWeight.bold))]),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(
+                              Icons.remove_circle,
+                              color: Colors.red,
+                              size: 16,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Chi phí',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -535,56 +603,60 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            TextFormField(
+            AppNumberField(
               controller: _amountController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              decoration: const InputDecoration(
-                labelText: 'Số tiền (VNĐ)',
-                prefixText: 'đ ',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              ),
+              label: 'Số tiền',
+              suffixText: 'đ',
               validator: (v) => v!.isEmpty ? 'Nhập số tiền' : null,
             ),
-             const SizedBox(height: 16),
-             InkWell(
-               onTap: () async {
-                 final picked = await showDatePicker(context: context, firstDate: DateTime(2020), lastDate: DateTime.now(), initialDate: _selectedDate);
-                 if (picked != null) setState(() => _selectedDate = picked);
-               },
-               child: InputDecorator(
-                 decoration: const InputDecoration(labelText: 'Ngày giao dịch', border: OutlineInputBorder(), prefixIcon: Icon(Icons.calendar_today)),
-                 child: Text(DateFormat('dd/MM/yyyy').format(_selectedDate)),
-               ),
-             ),
-             const SizedBox(height: 16),
-             DropdownButtonFormField<String>(
-               key: ValueKey(_dropdownKey),
-               initialValue: _selectedCategory,
-               decoration: const InputDecoration(labelText: 'Danh mục', border: OutlineInputBorder(), prefixIcon: Icon(Icons.category)),
-               items: (_selectedType == 'income' ? _incomeCategories : _expenseCategories).map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-               onChanged: (v) => setState(() => _selectedCategory = v),
-             ),
-             const SizedBox(height: 16),
-             TextFormField(
-              controller: _descController,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Mô tả chi tiết',
-                hintText: 'Ví dụ: Thu tiền giặt 5kg quần áo...',
-                border: OutlineInputBorder(),
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                  initialDate: _selectedDate,
+                );
+                if (picked != null) setState(() => _selectedDate = picked);
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Ngày giao dịch',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.calendar_today),
+                ),
+                child: Text(DateFormat('dd/MM/yyyy').format(_selectedDate)),
               ),
+            ),
+            const SizedBox(height: 16),
+            AppDropdown<String>(
+              label: 'Danh mục',
+              value: _selectedCategory,
+              items:
+                  (_selectedType == 'income'
+                          ? _incomeCategories
+                          : _expenseCategories)
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
+              onChanged: (v) => setState(() => _selectedCategory = v),
+              hintText: 'Chọn danh mục',
+            ),
+            const SizedBox(height: 16),
+            AppTextField(
+              controller: _descController,
+              label: 'Mô tả chi tiết',
+              hintText: 'Ví dụ: Thu tiền giặt 5kg quần áo...',
+              maxLines: 2,
             ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               height: 50,
-              child: ElevatedButton.icon(
+              child: PrimaryButton(
                 onPressed: _isSubmitting ? null : _submitTransaction,
-                icon: const Icon(Icons.save),
-                label: const Text('Lưu Giao Dịch', style: TextStyle(fontSize: 16)),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1976D2), foregroundColor: Colors.white),
+                icon: Icons.save,
+                label: 'Lưu Giao Dịch',
               ),
             ),
           ],
@@ -594,20 +666,23 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
   }
 
   Widget _buildTransactionList() {
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Lịch sử giao dịch', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text(
+            'Lịch sử giao dịch',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 16),
           if (_transactions.isEmpty)
-            const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('Chưa có giao dịch nào')))
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Text('Chưa có giao dịch nào'),
+              ),
+            )
           else
             ListView.separated(
               shrinkWrap: true,
@@ -621,20 +696,44 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                   contentPadding: EdgeInsets.zero,
                   leading: Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: (isIncome ? Colors.green : Colors.red).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                    child: Icon(isIncome ? Icons.arrow_upward : Icons.arrow_downward, color: isIncome ? Colors.green : Colors.red),
+                    decoration: BoxDecoration(
+                      color: (isIncome ? Colors.green : Colors.red).withValues(
+                        alpha: 0.1,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      isIncome ? Icons.arrow_upward : Icons.arrow_downward,
+                      color: isIncome ? Colors.green : Colors.red,
+                    ),
                   ),
-                  title: Text(t.category, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('${DateFormat('dd/MM/yyyy').format(t.transactionDate)} • ${t.description ?? ''}'),
+                  title: Text(
+                    t.category,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    '${DateFormat('dd/MM/yyyy').format(t.transactionDate)} • ${t.description ?? ''}',
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         '${isIncome ? '+' : '-'}${NumberFormat.currency(locale: 'vi', symbol: 'đ').format(t.amount)}',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: isIncome ? Colors.green : Colors.red, fontSize: 16),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isIncome ? Colors.green : Colors.red,
+                          fontSize: 16,
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: Colors.grey), onPressed: () => _deleteTransaction(t)),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          size: 20,
+                          color: Colors.grey,
+                        ),
+                        onPressed: () => _deleteTransaction(t),
+                      ),
                     ],
                   ),
                 );

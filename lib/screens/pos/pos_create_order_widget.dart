@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../../models/customer.dart';
@@ -14,6 +14,9 @@ import '../../core/services/print_service.dart';
 import '../../config/theme.dart';
 import '../../config/constants.dart';
 import '../../widgets/pos_service_card.dart';
+import '../../widgets/ui/cards.dart';
+import '../../widgets/ui/buttons.dart';
+import '../../widgets/ui/inputs.dart';
 
 /// Widget tạo đơn hàng nhanh trong POS
 class POSCreateOrderWidget extends StatefulWidget {
@@ -90,39 +93,33 @@ class _POSCreateOrderWidgetState extends State<POSCreateOrderWidget> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
+            AppTextField(
               controller: nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Tên cửa hàng',
-                hintText: 'VD: Giặt Sủi 24h',
-                prefixIcon: Icon(Icons.store),
-              ),
+              label: 'Tên cửa hàng',
+              hintText: 'VD: Giặt Sủi 24h',
+              prefixIcon: Icons.store,
             ),
             const SizedBox(height: 12),
-            TextField(
+            AppTextField(
               controller: addrCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Địa chỉ',
-                prefixIcon: Icon(Icons.location_on),
-              ),
+              label: 'Địa chỉ',
+              prefixIcon: Icons.location_on,
             ),
             const SizedBox(height: 12),
-            TextField(
+            AppTextField(
               controller: phoneCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Số điện thoại',
-                prefixIcon: Icon(Icons.phone),
-              ),
+              label: 'Số điện thoại',
+              prefixIcon: Icons.phone,
               keyboardType: TextInputType.phone,
             ),
           ],
         ),
         actions: [
-          TextButton(
+          SecondaryButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
+            label: 'Hủy',
           ),
-          ElevatedButton(
+          PrimaryButton(
             onPressed: () async {
               if (nameCtrl.text.isEmpty) return;
 
@@ -135,7 +132,7 @@ class _POSCreateOrderWidgetState extends State<POSCreateOrderWidget> {
 
               if (context.mounted) Navigator.pop(context);
             },
-            child: const Text('Lưu cấu hình'),
+            label: 'Lưu cấu hình',
           ),
         ],
       ),
@@ -397,12 +394,9 @@ class _POSCreateOrderWidgetState extends State<POSCreateOrderWidget> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header
-                Row(
-                  children: [
-                    Icon(Icons.cleaning_services, color: AppTheme.primaryColor),
-                    const SizedBox(width: 8),
-                    Text('Chọn dịch vụ', style: AppTheme.heading3),
-                  ],
+                const SectionHeader(
+                  title: 'Chọn dịch vụ',
+                  icon: Icons.cleaning_services,
                 ),
                 const SizedBox(height: 16),
 
@@ -419,37 +413,46 @@ class _POSCreateOrderWidgetState extends State<POSCreateOrderWidget> {
                       final availableWidth = constraints.maxWidth;
                       final availableHeight = constraints.maxHeight;
 
-                      // Minimum card size for touch
-                      const minCardWidth = 140.0;
+                      // Minimum card size
+                      const minCardWidth = 150.0;
+                      const minCardHeight = 200.0;
                       const spacing = 12.0;
 
                       // Calculate columns based on width
                       int crossAxisCount = (availableWidth / minCardWidth)
                           .floor();
-                      crossAxisCount = crossAxisCount.clamp(2, 6);
+                      crossAxisCount = crossAxisCount.clamp(2, 5);
 
                       // Calculate rows needed
                       final rows = (itemCount / crossAxisCount).ceil();
 
-                      // Calculate card height to fit all rows
-                      final totalSpacing = (rows - 1) * spacing;
-                      final cardHeight =
-                          (availableHeight - totalSpacing) / rows;
-
-                      // Calculate card width
+                      // Calculate sizing
                       final totalHSpacing = (crossAxisCount - 1) * spacing;
                       final cardWidth =
                           (availableWidth - totalHSpacing) / crossAxisCount;
+
+                      final totalVSpacing = (rows - 1) * spacing;
+                      double cardHeight =
+                          (availableHeight - totalVSpacing) / rows;
+
+                      // Determine if scrolling is needed
+                      ScrollPhysics scrollPhysics =
+                          const NeverScrollableScrollPhysics();
+
+                      if (cardHeight < minCardHeight) {
+                        cardHeight = minCardHeight;
+                        scrollPhysics = const AlwaysScrollableScrollPhysics();
+                      }
 
                       // Aspect ratio
                       final aspectRatio = cardWidth / cardHeight;
 
                       return GridView.builder(
-                        physics:
-                            const NeverScrollableScrollPhysics(), // Disable scroll
+                        physics: scrollPhysics,
+                        padding: const EdgeInsets.only(bottom: 16),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: crossAxisCount,
-                          childAspectRatio: aspectRatio.clamp(0.6, 1.8),
+                          childAspectRatio: aspectRatio,
                           crossAxisSpacing: spacing,
                           mainAxisSpacing: spacing,
                         ),
@@ -482,200 +485,136 @@ class _POSCreateOrderWidgetState extends State<POSCreateOrderWidget> {
           child: Column(
             children: [
               // 1. Customer Card
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+              AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Khách hàng',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (!_isAddingNewCustomer)
+                          SizedBox(
+                            height: 36,
+                            child: SecondaryButton(
+                              onPressed: () =>
+                                  setState(() => _isAddingNewCustomer = true),
+                              icon: Icons.person_add,
+                              label: 'Thêm mới',
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (_isAddingNewCustomer) ...[
+                      // Quick add customer form - Larger inputs
+                      AppTextField(
+                        controller: _customerNameController,
+                        label: 'Tên khách hàng',
+                        prefixIcon: Icons.account_circle_outlined,
+                      ),
+                      const SizedBox(height: 12),
+                      AppTextField(
+                        controller: _customerPhoneController,
+                        label: 'Số điện thoại',
+                        prefixIcon: Icons.phone_outlined,
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.blue[50],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.person,
-                              color: Color(0xFF1565C0),
+                          Expanded(
+                            child: SecondaryButton(
+                              onPressed: () => setState(() {
+                                _isAddingNewCustomer = false;
+                                _customerNameController.clear();
+                                _customerPhoneController.clear();
+                              }),
+                              label: 'Hủy bỏ',
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Text(
-                            'Khách hàng',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                          Expanded(
+                            child: PrimaryButton(
+                              onPressed: _quickAddCustomer,
+                              label: 'Lưu',
                             ),
                           ),
-                          const Spacer(),
-                          if (!_isAddingNewCustomer)
-                            ElevatedButton.icon(
-                              onPressed: () =>
-                                  setState(() => _isAddingNewCustomer = true),
-                              icon: const Icon(Icons.person_add, size: 18),
-                              label: const Text('Thêm mới'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFE3F2FD),
-                                foregroundColor: const Color(0xFF1565C0),
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-
-                      if (_isAddingNewCustomer) ...[
-                        // Quick add customer form - Larger inputs
-                        TextField(
-                          controller: _customerNameController,
-                          decoration: InputDecoration(
-                            labelText: 'Tên khách hàng',
-                            prefixIcon: const Icon(
-                              Icons.account_circle_outlined,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _customerPhoneController,
-                          keyboardType: TextInputType.phone,
-                          decoration: InputDecoration(
-                            labelText: 'Số điện thoại',
-                            prefixIcon: const Icon(Icons.phone_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                          ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextButton(
-                                onPressed: () => setState(() {
-                                  _isAddingNewCustomer = false;
-                                  _customerNameController.clear();
-                                  _customerPhoneController.clear();
-                                }),
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  foregroundColor: Colors.grey[700],
-                                ),
-                                child: const Text('Hủy bỏ'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: _quickAddCustomer,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF1565C0),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text('Lưu khách hàng'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ] else ...[
-                        // Customer Searchable Dropdown
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            return DropdownMenu<Customer>(
-                              width: constraints.maxWidth,
-                              enableFilter: true, // Cho phép nhập để tìm kiếm
-                              requestFocusOnTap:
-                                  true, // Tự động focus khi bấm vào
-                              label: const Text(
-                                'Tìm khách hàng (Tên hoặc SĐT)',
-                              ),
-                              inputDecorationTheme: InputDecorationTheme(
-                                filled: true,
-                                fillColor: Colors.grey[50],
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.grey[300]!,
-                                  ),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
+                    ] else ...[
+                      // Customer Searchable Dropdown
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          return DropdownMenu<Customer>(
+                            width: constraints.maxWidth,
+                            enableFilter: true, // Cho phép nhập để tìm kiếm
+                            requestFocusOnTap:
+                                true, // Tự động focus khi bấm vào
+                            label: const Text('Tìm khách hàng (Tên hoặc SĐT)'),
+                            inputDecorationTheme: InputDecorationTheme(
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
                                 ),
                               ),
-                              menuStyle: MenuStyle(
-                                backgroundColor: WidgetStateProperty.all(
-                                  Colors.white,
-                                ),
-                                elevation: WidgetStateProperty.all(4),
-                                maximumSize: WidgetStateProperty.all(
-                                  const Size.fromHeight(300),
-                                ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 16,
                               ),
-                              dropdownMenuEntries: _customers
-                                  .map<DropdownMenuEntry<Customer>>((
-                                    Customer customer,
-                                  ) {
-                                    return DropdownMenuEntry<Customer>(
-                                      value: customer,
-                                      label:
-                                          '${customer.name} - ${customer.phone}',
-                                      leadingIcon: const Icon(
-                                        Icons.person_outline,
+                            ),
+                            menuStyle: MenuStyle(
+                              backgroundColor: WidgetStateProperty.all(
+                                Colors.white,
+                              ),
+                              elevation: WidgetStateProperty.all(4),
+                              maximumSize: WidgetStateProperty.all(
+                                const Size.fromHeight(300),
+                              ),
+                            ),
+                            dropdownMenuEntries: _customers
+                                .map<DropdownMenuEntry<Customer>>((
+                                  Customer customer,
+                                ) {
+                                  return DropdownMenuEntry<Customer>(
+                                    value: customer,
+                                    label:
+                                        '${customer.name} - ${customer.phone}',
+                                    leadingIcon: const Icon(
+                                      Icons.person_outline,
+                                    ),
+                                    style: ButtonStyle(
+                                      padding: WidgetStateProperty.all(
+                                        const EdgeInsets.all(12),
                                       ),
-                                      style: ButtonStyle(
-                                        padding: WidgetStateProperty.all(
-                                          const EdgeInsets.all(12),
-                                        ),
-                                        textStyle: WidgetStateProperty.all(
-                                          const TextStyle(fontSize: 16),
-                                        ),
+                                      textStyle: WidgetStateProperty.all(
+                                        const TextStyle(fontSize: 16),
                                       ),
-                                    );
-                                  })
-                                  .toList(),
-                              onSelected: (Customer? customer) {
-                                setState(() {
-                                  _selectedCustomer = customer;
-                                });
-                              },
-                              initialSelection: _selectedCustomer,
-                            );
-                          },
-                        ),
-                      ],
+                                    ),
+                                  );
+                                })
+                                .toList(),
+                            onSelected: (Customer? customer) {
+                              setState(() {
+                                _selectedCustomer = customer;
+                              });
+                            },
+                            initialSelection: _selectedCustomer,
+                          );
+                        },
+                      ),
                     ],
-                  ),
+                  ],
                 ),
               ),
 
@@ -683,340 +622,309 @@ class _POSCreateOrderWidgetState extends State<POSCreateOrderWidget> {
 
               // 2. Order Details Card (Bill style)
               Expanded(
-                child: Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        // Store Info Header
-                        if (_storeName != null) ...[
-                          InkWell(
-                            onTap:
-                                _showQuickStoreSettingsDialog, // Allow editing by tapping name
-                            child: Column(
-                              children: [
+                child: AppCard(
+                  child: Column(
+                    children: [
+                      // Store Info Header
+                      if (_storeName != null) ...[
+                        InkWell(
+                          onTap:
+                              _showQuickStoreSettingsDialog, // Allow editing by tapping name
+                          child: Column(
+                            children: [
+                              Text(
+                                _storeName!,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              if (_storeAddress != null) ...[
+                                const SizedBox(height: 4),
                                 Text(
-                                  _storeName!,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
+                                  _storeAddress!,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[700],
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                              if (_storePhone != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Hotline: $_storePhone',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[700],
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
-                                if (_storeAddress != null) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _storeAddress!,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey[700],
-                                    ),
-                                    textAlign: TextAlign.center,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Divider(height: 1),
+                        const SizedBox(height: 12),
+                      ] else ...[
+                        // Button to configure store info
+                        InkWell(
+                          onTap: _showQuickStoreSettingsDialog,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 8,
+                            ),
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.orange[50],
+                              border: Border.all(color: Colors.orange[300]!),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.store_mall_directory,
+                                  color: Colors.orange[800],
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Cài đặt thông tin cửa hàng',
+                                  style: TextStyle(
+                                    color: Colors.orange[900],
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                ],
-                                if (_storePhone != null) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Hotline: $_storePhone',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey[700],
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
+                                ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          const Divider(height: 1),
-                          const SizedBox(height: 12),
-                        ] else ...[
-                          // Button to configure store info
-                          InkWell(
-                            onTap: _showQuickStoreSettingsDialog,
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 12,
-                                horizontal: 8,
+                        ),
+                        const Divider(height: 1),
+                        const SizedBox(height: 12),
+                      ],
+
+                      // Date Picker
+                      InkWell(
+                        onTap: _pickDeliveryDateTime,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.orange[200]!),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.access_time_filled,
+                                color: Colors.orange,
                               ),
-                              margin: const EdgeInsets.only(bottom: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.orange[50],
-                                border: Border.all(color: Colors.orange[300]!),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.store_mall_directory,
-                                    color: Colors.orange[800],
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Cài đặt thông tin cửa hàng',
-                                    style: TextStyle(
-                                      color: Colors.orange[900],
-                                      fontWeight: FontWeight.bold,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Hẹn giao đồ',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    Text(
+                                      DateFormat(
+                                        'dd/MM/yyyy • HH:mm',
+                                      ).format(_deliveryDate),
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.orange,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                              const Icon(
+                                Icons.edit,
+                                color: Colors.orange,
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const Divider(height: 32),
+
+                      // Header Bill
+                      Row(
+                        children: const [
+                          Icon(
+                            Icons.receipt_long,
+                            size: 20,
+                            color: Colors.grey,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'CHI TIẾT ĐƠN HÀNG',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey,
                             ),
                           ),
-                          const Divider(height: 1),
-                          const SizedBox(height: 12),
                         ],
+                      ),
+                      const SizedBox(height: 12),
 
-                        // Date Picker
-                        InkWell(
-                          onTap: _pickDeliveryDateTime,
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.orange[50],
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.orange[200]!),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.access_time_filled,
-                                  color: Colors.orange,
+                      // List items
+                      Expanded(
+                        child: _serviceQuantities.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.add_shopping_cart,
+                                      size: 48,
+                                      color: Colors.grey[300],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Chưa chọn dịch vụ nào',
+                                      style: TextStyle(color: Colors.grey[500]),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
+                              )
+                            : ListView.separated(
+                                itemCount: _serviceQuantities.length,
+                                separatorBuilder: (_, __) =>
+                                    const Divider(height: 16),
+                                itemBuilder: (context, index) {
+                                  final entry = _serviceQuantities.entries
+                                      .elementAt(index);
+                                  final service = _services.firstWhere(
+                                    (s) => s.id == entry.key,
+                                  );
+                                  return Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      const Text(
-                                        'Hẹn giao đồ',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
-                                      Text(
-                                        DateFormat(
-                                          'dd/MM/yyyy • HH:mm',
-                                        ).format(_deliveryDate),
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.orange,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const Icon(
-                                  Icons.edit,
-                                  color: Colors.orange,
-                                  size: 20,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        const Divider(height: 32),
-
-                        // Header Bill
-                        Row(
-                          children: const [
-                            Icon(
-                              Icons.receipt_long,
-                              size: 20,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'CHI TIẾT ĐƠN HÀNG',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        // List items
-                        Expanded(
-                          child: _serviceQuantities.isEmpty
-                              ? Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.add_shopping_cart,
-                                        size: 48,
-                                        color: Colors.grey[300],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        'Chưa chọn dịch vụ nào',
-                                        style: TextStyle(
-                                          color: Colors.grey[500],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : ListView.separated(
-                                  itemCount: _serviceQuantities.length,
-                                  separatorBuilder: (_, __) =>
-                                      const Divider(height: 16),
-                                  itemBuilder: (context, index) {
-                                    final entry = _serviceQuantities.entries
-                                        .elementAt(index);
-                                    final service = _services.firstWhere(
-                                      (s) => s.id == entry.key,
-                                    );
-                                    return Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey[100],
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            'x${entry.value}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: Color(0xFF1565C0),
-                                            ),
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[100],
+                                          borderRadius: BorderRadius.circular(
+                                            8,
                                           ),
                                         ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                service.name,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                              Text(
-                                                currencyFormat.format(
-                                                  service.price,
-                                                ),
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey[600],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        Text(
-                                          currencyFormat.format(
-                                            service.price * entry.value,
-                                          ),
+                                        child: Text(
+                                          'x${entry.value}',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
+                                            color: Color(0xFF1565C0),
                                           ),
                                         ),
-                                        const SizedBox(width: 4),
-                                        InkWell(
-                                          onTap: () =>
-                                              _decrementService(service),
-                                          child: const Padding(
-                                            padding: EdgeInsets.all(4),
-                                            child: Icon(
-                                              Icons.remove_circle_outline,
-                                              size: 20,
-                                              color: Colors.red,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              service.name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w500,
+                                              ),
                                             ),
+                                            Text(
+                                              currencyFormat.format(
+                                                service.price,
+                                              ),
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Text(
+                                        currencyFormat.format(
+                                          service.price * entry.value,
+                                        ),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      InkWell(
+                                        onTap: () => _decrementService(service),
+                                        child: const Padding(
+                                          padding: EdgeInsets.all(4),
+                                          child: Icon(
+                                            Icons.remove_circle_outline,
+                                            size: 20,
+                                            color: Colors.red,
                                           ),
                                         ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                        ),
-
-                        const Divider(thickness: 1, height: 32),
-
-                        // Total
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Tổng cộng:',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                            Text(
-                              currencyFormat.format(_totalAmount),
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1565C0),
+                                      ),
+                                    ],
+                                  );
+                                },
                               ),
+                      ),
+
+                      const Divider(thickness: 1, height: 32),
+
+                      // Total
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Tổng cộng:',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          Text(
+                            currencyFormat.format(_totalAmount),
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1565C0),
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+
               // 3. Create Button
               SizedBox(
                 width: double.infinity,
                 height: 64,
-                child: ElevatedButton.icon(
+                child: PrimaryButton(
                   onPressed:
                       _isCreating ||
                           _serviceQuantities.isEmpty ||
                           _selectedCustomer == null
                       ? null
                       : _createOrder,
-                  icon: _isCreating
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.print, size: 28),
-                  label: Text(
-                    _isCreating ? 'ĐANG TẠO...' : 'TẠO ĐƠN & IN BILL',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1565C0),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 4,
-                  ),
+                  isLoading: _isCreating,
+                  icon: Icons.print,
+                  label: _isCreating ? 'ĐANG TẠO...' : 'TẠO ĐƠN & IN BILL',
                 ),
               ),
             ],
