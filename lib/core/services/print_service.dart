@@ -18,7 +18,7 @@ class PrintService {
     String? storeName,
   ) async {
     final pdf = pw.Document();
-    
+
     final font = await PdfGoogleFonts.robotoRegular();
     final fontBold = await PdfGoogleFonts.robotoBold();
 
@@ -36,10 +36,7 @@ class PrintService {
           AppConstants.labelWidth * PdfPageFormat.mm,
           AppConstants.labelHeight * PdfPageFormat.mm,
         ),
-        theme: pw.ThemeData.withFont(
-          base: font,
-          bold: fontBold,
-        ),
+        theme: pw.ThemeData.withFont(base: font, bold: fontBold),
         margin: pw.EdgeInsets.all(2 * PdfPageFormat.mm),
         build: (context) {
           return pw.Column(
@@ -54,22 +51,22 @@ class PrintService {
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
-              
+
               pw.SizedBox(height: 2),
-              
+
               // Order code
               pw.Text(
                 'Mã ĐH: ${order.orderCode}',
                 style: const pw.TextStyle(fontSize: 8),
               ),
-              
+
               // Customer name
               pw.Text(
                 'KH: ${customer.name}',
                 style: const pw.TextStyle(fontSize: 7),
                 maxLines: 1,
               ),
-              
+
               // Dates
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -85,9 +82,9 @@ class PrintService {
                     ),
                 ],
               ),
-              
+
               pw.SizedBox(height: 1),
-              
+
               // Barcode
               pw.Center(
                 child: pw.SvgImage(
@@ -104,6 +101,33 @@ class PrintService {
     return pdf.save();
   }
 
+  /// In trực tiếp không hiện dialog - dùng cho POS
+  Future<void> _directPrint(Uint8List pdfData, String name) async {
+    // Lấy danh sách máy in
+    final printers = await Printing.listPrinters();
+
+    if (printers.isEmpty) {
+      throw Exception('Không tìm thấy máy in nào!');
+    }
+
+    // Tìm máy in mặc định hoặc dùng máy in đầu tiên
+    Printer? defaultPrinter;
+    for (final printer in printers) {
+      if (printer.isDefault) {
+        defaultPrinter = printer;
+        break;
+      }
+    }
+    defaultPrinter ??= printers.first;
+
+    // In trực tiếp
+    await Printing.directPrintPdf(
+      printer: defaultPrinter,
+      onLayout: (format) async => pdfData,
+      name: name,
+    );
+  }
+
   Future<void> printBarcodeLabel(
     Order order,
     Customer customer,
@@ -111,11 +135,45 @@ class PrintService {
   ) async {
     try {
       final pdfData = await generateBarcodeLabel(order, customer, storeName);
-      
-      await Printing.layoutPdf(
-        onLayout: (format) async => pdfData,
-        name: 'Order_${order.orderCode}_Label',
+      await _directPrint(pdfData, 'Order_${order.orderCode}_Label');
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// In 2 bill cùng lúc cho POS workflow:
+  /// - Bill 1: Hóa đơn cho khách (receipt)
+  /// - Bill 2: Nhãn dán đồ (label với barcode)
+  Future<void> printDualBills(
+    Order order,
+    Customer customer,
+    List<Map<String, dynamic>> orderItems,
+    String? storeName,
+    String employeeName, {
+    String? storeAddress,
+    String? storePhone,
+  }) async {
+    try {
+      // Generate both bills
+      final receiptPdf = await generateOrderReceipt(
+        order,
+        customer,
+        orderItems,
+        storeName,
+        employeeName,
+        storeAddress: storeAddress,
+        storePhone: storePhone,
+        footerMessage: 'Vui lòng giữ phiếu này để nhận đồ!',
       );
+
+      final labelPdf = await generateBarcodeLabel(order, customer, storeName);
+
+      // In trực tiếp không hiện dialog
+      // In receipt trước
+      await _directPrint(receiptPdf, 'Order_${order.orderCode}_Receipt');
+
+      // In label
+      await _directPrint(labelPdf, 'Order_${order.orderCode}_Label');
     } catch (e) {
       rethrow;
     }
@@ -133,7 +191,7 @@ class PrintService {
     PdfPageFormat pageFormat = PdfPageFormat.roll80,
   }) async {
     final pdf = pw.Document();
-    
+
     final font = await PdfGoogleFonts.robotoRegular();
     final fontBold = await PdfGoogleFonts.robotoBold();
     final fontItalic = await PdfGoogleFonts.robotoItalic();
@@ -146,26 +204,39 @@ class PrintService {
           bold: fontBold,
           italic: fontItalic,
         ),
-        margin: pw.EdgeInsets.all(5 * PdfPageFormat.mm),
+        // Tăng margin phải lên 8mm để tránh bị mất chữ ở mép phải (do máy in lệch)
+        margin: const pw.EdgeInsets.only(
+          left: 4 * PdfPageFormat.mm,
+          right: 8 * PdfPageFormat.mm,
+        ),
         build: (context) {
+          final smallStyle = const pw.TextStyle(fontSize: 8);
+          final mediumStyle = pw.TextStyle(
+            fontSize: 9,
+            fontWeight: pw.FontWeight.bold,
+          );
+          final titleStyle = pw.TextStyle(
+            fontSize: 12,
+            fontWeight: pw.FontWeight.bold,
+          );
+
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
+              pw.SizedBox(height: 5),
               // Store header
               pw.Center(
                 child: pw.Text(
-                  storeName ?? 'LAUNDRY MANAGEMENT',
-                  style: pw.TextStyle(
-                    fontSize: 16,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
+                  storeName ?? 'LAUNDRY STORE',
+                  style: titleStyle,
+                  textAlign: pw.TextAlign.center,
                 ),
               ),
               if (storeAddress != null && storeAddress.isNotEmpty)
                 pw.Center(
                   child: pw.Text(
                     storeAddress,
-                    style: const pw.TextStyle(fontSize: 10),
+                    style: const pw.TextStyle(fontSize: 7),
                     textAlign: pw.TextAlign.center,
                   ),
                 ),
@@ -173,143 +244,161 @@ class PrintService {
                 pw.Center(
                   child: pw.Text(
                     'Hotline: $storePhone',
-                    style: const pw.TextStyle(fontSize: 10),
+                    style: const pw.TextStyle(fontSize: 7),
                   ),
                 ),
-              
-              pw.SizedBox(height: 3),
-              pw.Divider(),
-              
-              // Order info
-              pw.Text('Mã đơn hàng: ${order.orderCode}'),
-              pw.Text('Ngày nhận: ${DateFormat('dd/MM/yyyy HH:mm').format(order.receivedDate)}'),
-              if (order.deliveryDate != null)
-                pw.Text('Ngày hẹn giao: ${DateFormat('dd/MM/yyyy').format(order.deliveryDate!)}'),
-              
-              pw.SizedBox(height: 3),
-              
-              // Customer info
-              pw.Text('Khách hàng: ${customer.name}'),
-              pw.Text('SĐT: ${customer.phone}'),
-              if (customer.address != null && customer.address!.isNotEmpty)
-                pw.Text('Địa chỉ: ${customer.address}'),
-              
-              pw.SizedBox(height: 3),
-              pw.Divider(),
-              
-              // Order items
-              pw.Text(
-                'Chi tiết dịch vụ:',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              ),
+
               pw.SizedBox(height: 2),
-              
+              pw.Divider(thickness: 0.5),
+              pw.SizedBox(height: 2),
+
+              // Order info
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Mã đơn: ${order.orderCode}', style: mediumStyle),
+                  pw.Text(
+                    DateFormat('dd/MM HH:mm').format(order.receivedDate),
+                    style: smallStyle,
+                  ),
+                ],
+              ),
+
+              if (order.deliveryDate != null)
+                pw.Text(
+                  'Hẹn giao: ${DateFormat('dd/MM/yyyy HH:mm').format(order.deliveryDate!)}',
+                  style: smallStyle,
+                ),
+
+              pw.SizedBox(height: 2),
+
+              // Customer info
+              pw.Text('KH: ${customer.name}', style: mediumStyle),
+              pw.Text('SĐT: ${customer.phone}', style: smallStyle),
+              if (customer.address != null && customer.address!.isNotEmpty)
+                pw.Text(
+                  'ĐC: ${customer.address}',
+                  style: const pw.TextStyle(fontSize: 7),
+                  maxLines: 2,
+                ),
+
+              pw.SizedBox(height: 2),
+              pw.Divider(thickness: 0.5),
+
+              // Order items
               ...orderItems.map((item) {
                 return pw.Padding(
                   padding: const pw.EdgeInsets.symmetric(vertical: 1),
                   child: pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Expanded(
                         child: pw.Text(
-                          '${item['service_name']} x${item['quantity']}',
-                          style: const pw.TextStyle(fontSize: 10),
+                          '${item['service_name']}',
+                          style: smallStyle,
                         ),
                       ),
-                      pw.Text(
-                        NumberFormat.currency(locale: 'vi', symbol: 'đ')
-                            .format(item['subtotal']),
-                        style: const pw.TextStyle(fontSize: 10),
+                      pw.Container(
+                        width: 20,
+                        alignment: pw.Alignment.center,
+                        child: pw.Text(
+                          'x${item['quantity']}',
+                          style: smallStyle,
+                        ),
+                      ),
+                      pw.Container(
+                        width: 50,
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Text(
+                          NumberFormat.currency(
+                            locale: 'vi',
+                            symbol: '',
+                          ).format(item['subtotal']),
+                          style: smallStyle,
+                        ),
                       ),
                     ],
                   ),
                 );
               }),
-              
-              pw.Divider(),
-              
-              // Total
+
+              pw.Divider(thickness: 0.5),
+
+              // Total & Payment
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
+                  pw.Text('TỔNG CỘNG:', style: mediumStyle),
                   pw.Text(
-                    'Tổng cộng:',
+                    NumberFormat.currency(
+                      locale: 'vi',
+                      symbol: 'đ',
+                    ).format(order.totalAmount),
                     style: pw.TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                  pw.Text(
-                    NumberFormat.currency(locale: 'vi', symbol: 'đ')
-                        .format(order.totalAmount),
-                    style: pw.TextStyle(
-                      fontSize: 12,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
+                    ), // Giảm font size một chút và viết hoa
                   ),
                 ],
               ),
-              
+
               pw.SizedBox(height: 2),
-              
-              // Payment info
+
+              // Luôn hiển thị thanh toán và còn lại
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Đã thanh toán:'),
+                  pw.Text('Đã thanh toán:', style: smallStyle),
                   pw.Text(
-                    NumberFormat.currency(locale: 'vi', symbol: 'đ')
-                        .format(order.paidAmount),
+                    NumberFormat.currency(
+                      locale: 'vi',
+                      symbol: 'đ',
+                    ).format(order.paidAmount),
+                    style: smallStyle,
                   ),
                 ],
               ),
-              
-              if (order.remainingAmount > 0)
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('Còn lại:'),
-                    pw.Text(
-                      NumberFormat.currency(locale: 'vi', symbol: 'đ')
-                          .format(order.remainingAmount),
-                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                    ),
-                  ],
-                ),
-              
-              pw.SizedBox(height: 3),
-              pw.Divider(),
-              
+
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('CÒN LẠI:', style: mediumStyle),
+                  pw.Text(
+                    NumberFormat.currency(
+                      locale: 'vi',
+                      symbol: 'đ',
+                    ).format(order.remainingAmount),
+                    style: mediumStyle,
+                  ),
+                ],
+              ),
+
+              pw.SizedBox(height: 4),
               // Barcode
               pw.Center(
                 child: pw.BarcodeWidget(
                   barcode: Barcode.code128(),
                   data: order.barcode,
-                  width: 60 * PdfPageFormat.mm,
-                  height: 20 * PdfPageFormat.mm,
+                  width: 35 * PdfPageFormat.mm, // Giảm width barcode để gọn hơn
+                  height: 10 * PdfPageFormat.mm,
+                  drawText: true,
+                  textStyle: const pw.TextStyle(fontSize: 7),
                 ),
               ),
-              
-              pw.SizedBox(height: 3),
-              
-              // Footer
-              pw.Center(
-                child: pw.Text(
-                  footerMessage ?? 'Cảm ơn quý khách!',
-                  style: pw.TextStyle(
-                    fontSize: 10,
-                    fontStyle: pw.FontStyle.italic,
+
+              if (footerMessage != null) ...[
+                pw.SizedBox(height: 2),
+                pw.Center(
+                  child: pw.Text(
+                    footerMessage,
+                    style: const pw.TextStyle(fontSize: 7),
+                    textAlign: pw.TextAlign.center,
                   ),
-                  textAlign: pw.TextAlign.center,
                 ),
-              ),
-              
-              pw.Center(
-                child: pw.Text(
-                  'Nhân viên: $employeeName',
-                  style: const pw.TextStyle(fontSize: 8),
-                ),
-              ),
+              ],
+              pw.Text(
+                '.',
+                style: const pw.TextStyle(fontSize: 1, color: PdfColors.white),
+              ), // Spacer for cutter
             ],
           );
         },
@@ -342,7 +431,7 @@ class PrintService {
         footerMessage: footerMessage,
         pageFormat: pageFormat,
       );
-      
+
       await Printing.layoutPdf(
         onLayout: (format) async => pdfData,
         name: 'Order_${order.orderCode}_Receipt',

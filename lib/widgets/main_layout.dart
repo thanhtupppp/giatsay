@@ -9,7 +9,7 @@ class MainLayout extends StatelessWidget {
   final Widget child;
   final String title;
   final bool isLoading;
-  
+
   const MainLayout({
     super.key,
     required this.child,
@@ -20,53 +20,51 @@ class MainLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Stack(
-        children: [
-            Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Icon(Icons.person, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  AuthService.instance.currentUser?.fullName ?? 'User',
-                  style: const TextStyle(fontSize: 14),
+      children: [
+        Scaffold(
+          appBar: AppBar(
+            title: Text(title),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Icon(Icons.person, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      AuthService.instance.currentUser?.fullName ?? 'User',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(width: 16),
+                    IconButton(
+                      icon: const Icon(Icons.logout),
+                      onPressed: () => _handleLogout(context),
+                      tooltip: 'Đăng xuất',
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                IconButton(
-                  icon: const Icon(Icons.logout),
-                  onPressed: () => _handleLogout(context),
-                  tooltip: 'Đăng xuất',
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-      body: Row(
-        children: [
-          _buildSidebar(context),
-          Expanded(child: child),
-        ],
-      ),
-      ),
-    if (isLoading)
-      Container(
-        color: Colors.black54,
-        child: const Center(
-          child: CircularProgressIndicator(),
+          body: Row(
+            children: [
+              _buildSidebar(context),
+              Expanded(child: child),
+            ],
+          ),
         ),
-      ),
-  ],
-);
+        if (isLoading)
+          Container(
+            color: Colors.black54,
+            child: const Center(child: CircularProgressIndicator()),
+          ),
+      ],
+    );
   }
 
   Widget _buildSidebar(BuildContext context) {
     final currentRoute = GoRouterState.of(context).matchedLocation;
-    
+
     return Container(
       width: 250,
       color: AppTheme.primaryDark,
@@ -96,14 +94,21 @@ class MainLayout extends StatelessWidget {
               ],
             ),
           ),
-          
+
           const Divider(color: Colors.white24),
-          
+
           // Menu items
           Expanded(
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
+                _buildMenuItem(
+                  context: context,
+                  icon: Icons.point_of_sale,
+                  label: 'POS',
+                  route: '/pos',
+                  isActive: currentRoute == '/pos',
+                ),
                 _buildMenuItem(
                   context: context,
                   icon: Icons.dashboard,
@@ -202,10 +207,7 @@ class MainLayout extends StatelessWidget {
   }) {
     return ListTile(
       leading: Icon(icon, color: Colors.white),
-      title: Text(
-        label,
-        style: const TextStyle(color: Colors.white),
-      ),
+      title: Text(label, style: const TextStyle(color: Colors.white)),
       selected: isActive,
       selectedTileColor: Colors.white.withValues(alpha: 0.1),
       onTap: () => context.go(route),

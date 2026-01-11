@@ -1,4 +1,3 @@
-import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import '../core/database/database_helper.dart';
 import '../models/order.dart';
@@ -6,17 +5,49 @@ import '../models/order_item.dart';
 
 class OrderRepository {
   final DatabaseHelper _db = DatabaseHelper.instance;
-  final _uuid = const Uuid();
 
-  String _generateOrderCode() {
+  /// Tạo mã đơn hàng theo thứ tự: YYMMDD + số thứ tự trong ngày
+  /// Ví dụ: 2601110001, 2601110002...
+  Future<String> _generateOrderCode() async {
     final now = DateTime.now();
-    final dateStr = DateFormat('yyyyMMdd').format(now);
-    final timeStr = DateFormat('HHmmss').format(now);
-    return 'DH$dateStr$timeStr';
+    final dateStr = DateFormat('yyMMdd').format(now);
+
+    // Đếm số đơn trong ngày hôm nay
+    final db = await _db.database;
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final result = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM orders WHERE created_at >= ?",
+      [todayStart.toIso8601String()],
+    );
+    final count = (result.first['count'] as int) + 1;
+
+    // Format: YYMMDD + 4 số thứ tự (0001, 0002...)
+    return '$dateStr${count.toString().padLeft(4, '0')}';
   }
 
-  String _generateBarcode() {
-    return _uuid.v4().replaceAll('-', '').substring(0, 12).toUpperCase();
+  /// Tạo barcode theo thứ tự tăng dần đơn giản: 1, 2, 3...
+  /// Không dùng số 0 ở trước (padding)
+  Future<String> _generateBarcode() async {
+    final db = await _db.database;
+
+    // Lấy barcode của đơn hàng mới nhất
+    final result = await db.query(
+      'orders',
+      columns: ['barcode'],
+      orderBy: 'id DESC',
+      limit: 1,
+    );
+
+    int lastBarcode = 0;
+    if (result.isNotEmpty) {
+      final barcodeStr = result.first['barcode'] as String?;
+      if (barcodeStr != null) {
+        lastBarcode = int.tryParse(barcodeStr) ?? 0;
+      }
+    }
+
+    // Tăng lên 1
+    return (lastBarcode + 1).toString();
   }
 
   Future<int> create(Order order, List<OrderItem> items) async {
@@ -31,10 +62,7 @@ class OrderRepository {
       // Insert order items using batch
       final batch = txn.batch();
       for (final item in items) {
-        batch.insert(
-          'order_items',
-          item.copyWith(orderId: orderId).toMap(),
-        );
+        batch.insert('order_items', item.copyWith(orderId: orderId).toMap());
       }
       await batch.commit(noResult: true);
 
@@ -44,13 +72,14 @@ class OrderRepository {
 
   Future<Order> createOrderWithCode(Order order, List<OrderItem> items) async {
     // Generate order code and barcode if not provided
-    final orderCode = order.orderCode.isEmpty ? _generateOrderCode() : order.orderCode;
-    final barcode = order.barcode.isEmpty ? _generateBarcode() : order.barcode;
+    final orderCode = order.orderCode.isEmpty
+        ? await _generateOrderCode()
+        : order.orderCode;
+    final barcode = order.barcode.isEmpty
+        ? await _generateBarcode()
+        : order.barcode;
 
-    final newOrder = order.copyWith(
-      orderCode: orderCode,
-      barcode: barcode,
-    );
+    final newOrder = order.copyWith(orderCode: orderCode, barcode: barcode);
 
     final id = await create(newOrder, items);
     return newOrder.copyWith(id: id);
@@ -107,11 +136,7 @@ class OrderRepository {
   }
 
   Future<Order?> getById(int id) async {
-    final results = await _db.query(
-      'orders',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    final results = await _db.query('orders', where: 'id = ?', whereArgs: [id]);
 
     if (results.isEmpty) return null;
     return Order.fromMap(results.first);
@@ -149,8 +174,11 @@ class OrderRepository {
     return results.map((map) => OrderItem.fromMap(map)).toList();
   }
 
-  Future<List<Map<String, dynamic>>> getOrderItemsWithServiceName(int orderId) async {
-    return await _db.rawQuery('''
+  Future<List<Map<String, dynamic>>> getOrderItemsWithServiceName(
+    int orderId,
+  ) async {
+    return await _db.rawQuery(
+      '''
       SELECT 
         oi.*,
         s.name as service_name,
@@ -158,7 +186,9 @@ class OrderRepository {
       FROM order_items oi
       INNER JOIN services s ON oi.service_id = s.id
       WHERE oi.order_id = ?
-    ''', [orderId]);
+    ''',
+      [orderId],
+    );
   }
 
   Future<List<Map<String, dynamic>>> getAllWithCustomerInfo({
@@ -231,7 +261,11 @@ class OrderRepository {
     );
   }
 
-  Future<int> updatePayment(int orderId, double paidAmount, String? paymentMethod) async {
+  Future<int> updatePayment(
+    int orderId,
+    double paidAmount,
+    String? paymentMethod,
+  ) async {
     return await _db.update(
       'orders',
       {
@@ -243,7 +277,7 @@ class OrderRepository {
       whereArgs: [orderId],
     );
   }
-  
+
   Future<List<Map<String, dynamic>>> getOrdersByCustomer(int customerId) async {
     return await _db.query(
       'orders',
@@ -255,11 +289,7 @@ class OrderRepository {
 
   Future<int> delete(int id) async {
     // Order items will be automatically deleted due to ON DELETE CASCADE
-    return await _db.delete(
-      'orders',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await _db.delete('orders', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<Map<String, int>> getOrderStatusCounts() async {
@@ -277,7 +307,10 @@ class OrderRepository {
     return counts;
   }
 
-  Future<double> getTotalRevenue({DateTime? startDate, DateTime? endDate}) async {
+  Future<double> getTotalRevenue({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
     String where = '1=1';
     List<dynamic> whereArgs = [];
 
@@ -304,7 +337,8 @@ class OrderRepository {
     required DateTime startDate,
     required DateTime endDate,
   }) async {
-    return await _db.rawQuery('''
+    return await _db.rawQuery(
+      '''
       SELECT 
         DATE(received_date) as date,
         COUNT(*) as order_count,
@@ -314,14 +348,20 @@ class OrderRepository {
       WHERE DATE(received_date) BETWEEN ? AND ?
       GROUP BY DATE(received_date)
       ORDER BY date
-    ''', [
-      DateFormat('yyyy-MM-dd').format(startDate),
-      DateFormat('yyyy-MM-dd').format(endDate),
-    ]);
+    ''',
+      [
+        DateFormat('yyyy-MM-dd').format(startDate),
+        DateFormat('yyyy-MM-dd').format(endDate),
+      ],
+    );
   }
-  
-  Future<Map<String, dynamic>> getRevenueStats(DateTime startDate, DateTime endDate) async {
-    final result = await _db.rawQuery('''
+
+  Future<Map<String, dynamic>> getRevenueStats(
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    final result = await _db.rawQuery(
+      '''
       SELECT 
         COUNT(*) as total_orders,
         COALESCE(SUM(total_amount), 0) as total_revenue,
@@ -329,11 +369,13 @@ class OrderRepository {
         COALESCE(AVG(total_amount), 0) as avg_order_value
       FROM orders
       WHERE DATE(received_date) BETWEEN ? AND ?
-    ''', [
-      DateFormat('yyyy-MM-dd').format(startDate),
-      DateFormat('yyyy-MM-dd').format(endDate),
-    ]);
-    
+    ''',
+      [
+        DateFormat('yyyy-MM-dd').format(startDate),
+        DateFormat('yyyy-MM-dd').format(endDate),
+      ],
+    );
+
     if (result.isEmpty) {
       return {
         'total_orders': 0,
@@ -342,12 +384,16 @@ class OrderRepository {
         'avg_order_value': 0.0,
       };
     }
-    
+
     return result.first;
   }
-  
-  Future<List<Map<String, dynamic>>> getDailyRevenue(DateTime startDate, DateTime endDate) async {
-    return await _db.rawQuery('''
+
+  Future<List<Map<String, dynamic>>> getDailyRevenue(
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    return await _db.rawQuery(
+      '''
       SELECT 
         DATE(received_date) as date,
         COALESCE(SUM(total_amount), 0) as revenue,
@@ -356,9 +402,11 @@ class OrderRepository {
       WHERE DATE(received_date) BETWEEN ? AND ?
       GROUP BY DATE(received_date)
       ORDER BY date
-    ''', [
-      DateFormat('yyyy-MM-dd').format(startDate),
-      DateFormat('yyyy-MM-dd').format(endDate),
-    ]);
+    ''',
+      [
+        DateFormat('yyyy-MM-dd').format(startDate),
+        DateFormat('yyyy-MM-dd').format(endDate),
+      ],
+    );
   }
 }

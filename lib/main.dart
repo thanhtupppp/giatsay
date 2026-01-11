@@ -19,13 +19,14 @@ import 'screens/settings/settings_screen.dart';
 import 'screens/inventory/material_list_screen.dart';
 import 'screens/timesheets/timesheet_screen.dart';
 import 'core/services/backup_service.dart';
+import 'screens/pos/pos_screen.dart';
 
 import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('vi', null);
-  
+
   // Check and perform auto-backup if enabled
   BackupService.instance.performAutoBackupIfNeeded();
 
@@ -63,10 +64,8 @@ final _router = GoRouter(
     return null;
   },
   routes: [
-    GoRoute(
-      path: '/login',
-      builder: (context, state) => const LoginScreen(),
-    ),
+    GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+    GoRoute(path: '/pos', builder: (context, state) => const POSScreen()),
     GoRoute(
       path: '/dashboard',
       builder: (context, state) => const DashboardScreen(),

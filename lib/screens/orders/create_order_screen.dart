@@ -26,39 +26,42 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   final _orderRepo = OrderRepository();
   final _customerRepo = CustomerRepository();
   final _serviceRepo = ServiceRepository();
-  
+
   // Form fields
   Customer? _selectedCustomer;
   DateTime _receivedDate = DateTime.now();
   DateTime _deliveryDate = DateTime.now().add(const Duration(days: 2));
-  TimeOfDay _deliveryTime = const TimeOfDay(hour: 17, minute: 0); // Default 5:00 PM
+  TimeOfDay _deliveryTime = const TimeOfDay(
+    hour: 17,
+    minute: 0,
+  ); // Default 5:00 PM
   String _notes = '';
   String _paymentMethod = AppConstants.paymentCash;
   double _paidAmount = 0;
-  
+
   // Order items
   final List<OrderItemData> _orderItems = [];
-  
+
   // Data
   List<Customer> _customers = [];
   List<Service> _services = [];
   bool _isLoading = false;
-  
+
   @override
   void initState() {
     super.initState();
     _loadData();
   }
-  
+
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       final customers = await _customerRepo.getAll();
       final services = await _serviceRepo.getAll();
-      
+
       setState(() {
         _customers = customers;
         _services = services.where((s) => s.isActive).toList();
@@ -78,51 +81,56 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       }
     }
   }
-  
+
   double get _totalAmount {
     return _orderItems.fold(0, (sum, item) => sum + item.subtotal);
   }
-  
+
   void _addOrderItem(Service service) {
     setState(() {
-      final existingIndex = _orderItems.indexWhere((item) => item.service.id == service.id);
-      
+      final existingIndex = _orderItems.indexWhere(
+        (item) => item.service.id == service.id,
+      );
+
       if (existingIndex >= 0) {
         _orderItems[existingIndex].quantity++;
-        _orderItems[existingIndex].subtotal = 
-            _orderItems[existingIndex].quantity * _orderItems[existingIndex].unitPrice;
+        _orderItems[existingIndex].subtotal =
+            _orderItems[existingIndex].quantity *
+            _orderItems[existingIndex].unitPrice;
       } else {
-        _orderItems.add(OrderItemData(
-          service: service,
-          quantity: 1,
-          unitPrice: service.price,
-          subtotal: service.price,
-        ));
+        _orderItems.add(
+          OrderItemData(
+            service: service,
+            quantity: 1,
+            unitPrice: service.price,
+            subtotal: service.price,
+          ),
+        );
       }
     });
   }
-  
+
   void _removeOrderItem(int index) {
     setState(() {
       _orderItems.removeAt(index);
     });
   }
-  
+
   void _updateQuantity(int index, int quantity) {
     if (quantity <= 0) {
       _removeOrderItem(index);
       return;
     }
-    
+
     setState(() {
       _orderItems[index].quantity = quantity;
       _orderItems[index].subtotal = quantity * _orderItems[index].unitPrice;
     });
   }
-  
+
   Future<void> _createOrder() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     if (_selectedCustomer == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -132,7 +140,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       );
       return;
     }
-    
+
     if (_orderItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -142,15 +150,15 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       );
       return;
     }
-    
+
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       final currentUser = AuthService.instance.currentUser;
       if (currentUser == null) throw Exception('User not logged in');
-      
+
       // Create order
       final order = Order(
         orderCode: '', // Will be generated
@@ -165,7 +173,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
         receivedDate: _receivedDate,
         deliveryDate: _deliveryDate,
       );
-      
+
       final items = _orderItems.map((itemData) {
         return OrderItem(
           orderId: 0, // Will be set by repository
@@ -175,24 +183,33 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
           subtotal: itemData.subtotal,
         );
       }).toList();
-      
+
       final createdOrder = await _orderRepo.createOrderWithCode(order, items);
-      
-      // Print barcode
-      await PrintService.instance.printBarcodeLabel(
+
+      // Get order items with service names for receipt
+      final orderItemsForPrint = await _orderRepo.getOrderItemsWithServiceName(
+        createdOrder.id!,
+      );
+
+      // Print 2 bills: 1 receipt for customer, 1 label for clothes
+      await PrintService.instance.printDualBills(
         createdOrder,
         _selectedCustomer!,
+        orderItemsForPrint,
         AppConstants.appName,
+        currentUser.fullName,
       );
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Đã tạo đơn hàng và in mã vạch thành công'),
+            content: Text(
+              'Đã tạo đơn hàng và in 2 bill thành công (1 cho khách, 1 dán đồ)',
+            ),
             backgroundColor: AppTheme.successColor,
           ),
         );
-        
+
         // Navigate back to order list
         context.go('/orders');
       }
@@ -200,7 +217,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       setState(() {
         _isLoading = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -211,19 +228,17 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       }
     }
   }
-  
+
   Future<void> _showAddCustomerDialog() async {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
     final addressController = TextEditingController();
     final formKey = GlobalKey<FormState>();
-    
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
           width: 500,
           padding: const EdgeInsets.all(32),
@@ -271,7 +286,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                   ],
                 ),
                 const SizedBox(height: 32),
-                
+
                 TextFormField(
                   controller: nameController,
                   decoration: InputDecoration(
@@ -297,7 +312,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                   },
                 ),
                 const SizedBox(height: 20),
-                
+
                 TextFormField(
                   controller: phoneController,
                   decoration: InputDecoration(
@@ -324,7 +339,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                   },
                 ),
                 const SizedBox(height: 20),
-                
+
                 TextFormField(
                   controller: addressController,
                   decoration: InputDecoration(
@@ -345,7 +360,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                   maxLines: 2,
                 ),
                 const SizedBox(height: 32),
-                
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -357,10 +372,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                           vertical: 16,
                         ),
                       ),
-                      child: const Text(
-                        'Hủy',
-                        style: TextStyle(fontSize: 16),
-                      ),
+                      child: const Text('Hủy', style: TextStyle(fontSize: 16)),
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton.icon(
@@ -392,24 +404,26 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
         ),
       ),
     );
-    
+
     if (result == true) {
       try {
-        final customerId = await _customerRepo.create(Customer(
-          name: nameController.text.trim(),
-          phone: phoneController.text.trim(),
-          address: addressController.text.trim().isEmpty 
-              ? null 
-              : addressController.text.trim(),
-        ));
-        
+        final customerId = await _customerRepo.create(
+          Customer(
+            name: nameController.text.trim(),
+            phone: phoneController.text.trim(),
+            address: addressController.text.trim().isEmpty
+                ? null
+                : addressController.text.trim(),
+          ),
+        );
+
         await _loadData();
-        
+
         // Select the newly created customer
         setState(() {
           _selectedCustomer = _customers.firstWhere((c) => c.id == customerId);
         });
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -449,12 +463,12 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
         }
       }
     }
-    
+
     nameController.dispose();
     phoneController.dispose();
     addressController.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return MainLayout(
@@ -477,12 +491,9 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Chọn dịch vụ',
-                                style: AppTheme.heading3,
-                              ),
+                              Text('Chọn dịch vụ', style: AppTheme.heading3),
                               const SizedBox(height: 16),
-                              
+
                               ..._services.map((service) {
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 8),
@@ -504,9 +515,9 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(width: 16),
-                    
+
                     // Right side - Order details
                     Expanded(
                       flex: 3,
@@ -521,23 +532,30 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                 style: AppTheme.heading3,
                               ),
                               const SizedBox(height: 16),
-                              
+
                               // Customer selection with autocomplete
                               Row(
                                 children: [
                                   Expanded(
                                     child: Autocomplete<Customer>(
-                                      optionsBuilder: (TextEditingValue textEditingValue) {
-                                        if (textEditingValue.text.isEmpty) {
-                                          return const Iterable<Customer>.empty();
-                                        }
-                                        final query = textEditingValue.text.toLowerCase();
-                                        return _customers.where((customer) {
-                                          final name = customer.name.toLowerCase();
-                                          final phone = customer.phone.toLowerCase();
-                                          return name.contains(query) || phone.contains(query);
-                                        });
-                                      },
+                                      optionsBuilder:
+                                          (TextEditingValue textEditingValue) {
+                                            if (textEditingValue.text.isEmpty) {
+                                              return const Iterable<
+                                                Customer
+                                              >.empty();
+                                            }
+                                            final query = textEditingValue.text
+                                                .toLowerCase();
+                                            return _customers.where((customer) {
+                                              final name = customer.name
+                                                  .toLowerCase();
+                                              final phone = customer.phone
+                                                  .toLowerCase();
+                                              return name.contains(query) ||
+                                                  phone.contains(query);
+                                            });
+                                          },
                                       displayStringForOption: (Customer customer) {
                                         return '${customer.name} - ${customer.phone}';
                                       },
@@ -546,86 +564,120 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                           _selectedCustomer = customer;
                                         });
                                       },
-                                      fieldViewBuilder: (
-                                        BuildContext context,
-                                        TextEditingController textEditingController,
-                                        FocusNode focusNode,
-                                        VoidCallback onFieldSubmitted,
-                                      ) {
-                                        // Pre-fill with selected customer
-                                        if (_selectedCustomer != null && textEditingController.text.isEmpty) {
-                                          textEditingController.text = 
-                                              '${_selectedCustomer!.name} - ${_selectedCustomer!.phone}';
-                                        }
-                                        
-                                        return TextFormField(
-                                          controller: textEditingController,
-                                          focusNode: focusNode,
-                                          decoration: InputDecoration(
-                                            labelText: 'Tìm khách hàng (tên hoặc SĐT) *',
-                                            hintText: 'Nhập tên hoặc số điện thoại...',
-                                            border: const OutlineInputBorder(),
-                                            prefixIcon: const Icon(Icons.person_search),
-                                            suffixIcon: _selectedCustomer != null
-                                                ? IconButton(
-                                                    icon: const Icon(Icons.clear),
-                                                    onPressed: () {
-                                                      setState(() {
-                                                        _selectedCustomer = null;
-                                                        textEditingController.clear();
-                                                      });
-                                                    },
-                                                  )
-                                                : null,
-                                          ),
-                                          validator: (value) {
-                                            if (_selectedCustomer == null) {
-                                              return 'Vui lòng chọn khách hàng hoặc thêm mới';
+                                      fieldViewBuilder:
+                                          (
+                                            BuildContext context,
+                                            TextEditingController
+                                            textEditingController,
+                                            FocusNode focusNode,
+                                            VoidCallback onFieldSubmitted,
+                                          ) {
+                                            // Pre-fill with selected customer
+                                            if (_selectedCustomer != null &&
+                                                textEditingController
+                                                    .text
+                                                    .isEmpty) {
+                                              textEditingController.text =
+                                                  '${_selectedCustomer!.name} - ${_selectedCustomer!.phone}';
                                             }
-                                            return null;
-                                          },
-                                        );
-                                      },
-                                      optionsViewBuilder: (
-                                        BuildContext context,
-                                        AutocompleteOnSelected<Customer> onSelected,
-                                        Iterable<Customer> options,
-                                      ) {
-                                        return Align(
-                                          alignment: Alignment.topLeft,
-                                          child: Material(
-                                            elevation: 4,
-                                            child: Container(
-                                              constraints: const BoxConstraints(
-                                                maxHeight: 200,
-                                                maxWidth: 400,
-                                              ),
-                                              child: ListView.builder(
-                                                padding: const EdgeInsets.all(8),
-                                                itemCount: options.length,
-                                                itemBuilder: (BuildContext context, int index) {
-                                                  final Customer customer = options.elementAt(index);
-                                                  return ListTile(
-                                                    leading: CircleAvatar(
-                                                      child: Text(
-                                                        customer.name[0].toUpperCase(),
-                                                        style: const TextStyle(
-                                                          fontWeight: FontWeight.bold,
+
+                                            return TextFormField(
+                                              controller: textEditingController,
+                                              focusNode: focusNode,
+                                              decoration: InputDecoration(
+                                                labelText:
+                                                    'Tìm khách hàng (tên hoặc SĐT) *',
+                                                hintText:
+                                                    'Nhập tên hoặc số điện thoại...',
+                                                border:
+                                                    const OutlineInputBorder(),
+                                                prefixIcon: const Icon(
+                                                  Icons.person_search,
+                                                ),
+                                                suffixIcon:
+                                                    _selectedCustomer != null
+                                                    ? IconButton(
+                                                        icon: const Icon(
+                                                          Icons.clear,
                                                         ),
-                                                      ),
-                                                    ),
-                                                    title: Text(customer.name),
-                                                    subtitle: Text(customer.phone),
-                                                    onTap: () {
-                                                      onSelected(customer);
-                                                    },
-                                                  );
-                                                },
+                                                        onPressed: () {
+                                                          setState(() {
+                                                            _selectedCustomer =
+                                                                null;
+                                                            textEditingController
+                                                                .clear();
+                                                          });
+                                                        },
+                                                      )
+                                                    : null,
                                               ),
-                                            ),
-                                          ),
-                                        );
-                                      },
+                                              validator: (value) {
+                                                if (_selectedCustomer == null) {
+                                                  return 'Vui lòng chọn khách hàng hoặc thêm mới';
+                                                }
+                                                return null;
+                                              },
+                                            );
+                                          },
+                                      optionsViewBuilder:
+                                          (
+                                            BuildContext context,
+                                            AutocompleteOnSelected<Customer>
+                                            onSelected,
+                                            Iterable<Customer> options,
+                                          ) {
+                                            return Align(
+                                              alignment: Alignment.topLeft,
+                                              child: Material(
+                                                elevation: 4,
+                                                child: Container(
+                                                  constraints:
+                                                      const BoxConstraints(
+                                                        maxHeight: 200,
+                                                        maxWidth: 400,
+                                                      ),
+                                                  child: ListView.builder(
+                                                    padding:
+                                                        const EdgeInsets.all(8),
+                                                    itemCount: options.length,
+                                                    itemBuilder:
+                                                        (
+                                                          BuildContext context,
+                                                          int index,
+                                                        ) {
+                                                          final Customer
+                                                          customer = options
+                                                              .elementAt(index);
+                                                          return ListTile(
+                                                            leading: CircleAvatar(
+                                                              child: Text(
+                                                                customer.name[0]
+                                                                    .toUpperCase(),
+                                                                style: const TextStyle(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            title: Text(
+                                                              customer.name,
+                                                            ),
+                                                            subtitle: Text(
+                                                              customer.phone,
+                                                            ),
+                                                            onTap: () {
+                                                              onSelected(
+                                                                customer,
+                                                              );
+                                                            },
+                                                          );
+                                                        },
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          },
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -637,7 +689,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                 ],
                               ),
                               const SizedBox(height: 16),
-                              
+
                               // Dates
                               Row(
                                 children: [
@@ -647,8 +699,12 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                         final date = await showDatePicker(
                                           context: context,
                                           initialDate: _receivedDate,
-                                          firstDate: DateTime.now().subtract(const Duration(days: 7)),
-                                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                                          firstDate: DateTime.now().subtract(
+                                            const Duration(days: 7),
+                                          ),
+                                          lastDate: DateTime.now().add(
+                                            const Duration(days: 365),
+                                          ),
                                         );
                                         if (date != null) {
                                           setState(() {
@@ -660,10 +716,14 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                         decoration: const InputDecoration(
                                           labelText: 'Ngày nhận *',
                                           border: OutlineInputBorder(),
-                                          suffixIcon: Icon(Icons.calendar_today),
+                                          suffixIcon: Icon(
+                                            Icons.calendar_today,
+                                          ),
                                         ),
                                         child: Text(
-                                          DateFormat('dd/MM/yyyy').format(_receivedDate),
+                                          DateFormat(
+                                            'dd/MM/yyyy',
+                                          ).format(_receivedDate),
                                         ),
                                       ),
                                     ),
@@ -676,7 +736,9 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                           context: context,
                                           initialDate: _deliveryDate,
                                           firstDate: _receivedDate,
-                                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                                          lastDate: DateTime.now().add(
+                                            const Duration(days: 365),
+                                          ),
                                         );
                                         if (date != null) {
                                           setState(() {
@@ -694,10 +756,14 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                         decoration: const InputDecoration(
                                           labelText: 'Ngày giao dự kiến *',
                                           border: OutlineInputBorder(),
-                                          suffixIcon: Icon(Icons.calendar_today),
+                                          suffixIcon: Icon(
+                                            Icons.calendar_today,
+                                          ),
                                         ),
                                         child: Text(
-                                          DateFormat('dd/MM/yyyy').format(_deliveryDate),
+                                          DateFormat(
+                                            'dd/MM/yyyy',
+                                          ).format(_deliveryDate),
                                         ),
                                       ),
                                     ),
@@ -712,9 +778,10 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                           initialTime: _deliveryTime,
                                           builder: (context, child) {
                                             return MediaQuery(
-                                              data: MediaQuery.of(context).copyWith(
-                                                alwaysUse24HourFormat: true,
-                                              ),
+                                              data: MediaQuery.of(context)
+                                                  .copyWith(
+                                                    alwaysUse24HourFormat: true,
+                                                  ),
                                               child: child!,
                                             );
                                           },
@@ -736,7 +803,10 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                         decoration: const InputDecoration(
                                           labelText: 'Giờ hẹn',
                                           border: OutlineInputBorder(),
-                                          suffixIcon: Icon(Icons.access_time, size: 16),
+                                          suffixIcon: Icon(
+                                            Icons.access_time,
+                                            size: 16,
+                                          ),
                                         ),
                                         child: Text(
                                           _deliveryTime.format(context),
@@ -748,25 +818,31 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                 ],
                               ),
                               const SizedBox(height: 16),
-                              
+
                               // Order items
                               Text(
                                 'Dịch vụ đã chọn',
-                                style: AppTheme.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+                                style: AppTheme.bodyLarge.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               const SizedBox(height: 8),
-                              
+
                               if (_orderItems.isEmpty)
                                 Container(
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    border: Border.all(color: AppTheme.textSecondary),
+                                    border: Border.all(
+                                      color: AppTheme.textSecondary,
+                                    ),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Center(
                                     child: Text(
                                       'Chưa có dịch vụ nào',
-                                      style: TextStyle(color: AppTheme.textSecondary),
+                                      style: TextStyle(
+                                        color: AppTheme.textSecondary,
+                                      ),
                                     ),
                                   ),
                                 )
@@ -774,7 +850,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                 ..._orderItems.asMap().entries.map((entry) {
                                   final index = entry.key;
                                   final item = entry.value;
-                                  
+
                                   return Card(
                                     margin: const EdgeInsets.only(bottom: 8),
                                     child: Padding(
@@ -784,17 +860,21 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                           Expanded(
                                             flex: 3,
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Text(
                                                   item.service.name,
-                                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
                                                 ),
                                                 Text(
                                                   '${NumberFormat.currency(locale: 'vi', symbol: 'đ').format(item.unitPrice)} / ${AppConstants.serviceUnitLabels[item.service.unit]}',
                                                   style: TextStyle(
                                                     fontSize: 12,
-                                                    color: AppTheme.textSecondary,
+                                                    color:
+                                                        AppTheme.textSecondary,
                                                   ),
                                                 ),
                                               ],
@@ -804,22 +884,36 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                           Row(
                                             children: [
                                               IconButton(
-                                                icon: const Icon(Icons.remove_circle_outline),
+                                                icon: const Icon(
+                                                  Icons.remove_circle_outline,
+                                                ),
                                                 iconSize: 20,
-                                                onPressed: () => _updateQuantity(index, item.quantity - 1),
+                                                onPressed: () =>
+                                                    _updateQuantity(
+                                                      index,
+                                                      item.quantity - 1,
+                                                    ),
                                               ),
                                               SizedBox(
                                                 width: 40,
                                                 child: Text(
                                                   item.quantity.toString(),
                                                   textAlign: TextAlign.center,
-                                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
                                                 ),
                                               ),
                                               IconButton(
-                                                icon: const Icon(Icons.add_circle_outline),
+                                                icon: const Icon(
+                                                  Icons.add_circle_outline,
+                                                ),
                                                 iconSize: 20,
-                                                onPressed: () => _updateQuantity(index, item.quantity + 1),
+                                                onPressed: () =>
+                                                    _updateQuantity(
+                                                      index,
+                                                      item.quantity + 1,
+                                                    ),
                                               ),
                                             ],
                                           ),
@@ -827,26 +921,31 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                           SizedBox(
                                             width: 100,
                                             child: Text(
-                                              NumberFormat.currency(locale: 'vi', symbol: 'đ')
-                                                  .format(item.subtotal),
+                                              NumberFormat.currency(
+                                                locale: 'vi',
+                                                symbol: 'đ',
+                                              ).format(item.subtotal),
                                               textAlign: TextAlign.right,
-                                              style: const TextStyle(fontWeight: FontWeight.w600),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                             ),
                                           ),
                                           IconButton(
                                             icon: const Icon(Icons.delete),
                                             iconSize: 20,
                                             color: AppTheme.errorColor,
-                                            onPressed: () => _removeOrderItem(index),
+                                            onPressed: () =>
+                                                _removeOrderItem(index),
                                           ),
                                         ],
                                       ),
                                     ),
                                   );
                                 }),
-                              
+
                               const Divider(height: 32),
-                              
+
                               // Payment
                               Row(
                                 children: [
@@ -857,10 +956,15 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                         labelText: 'Phương thức thanh toán',
                                         border: OutlineInputBorder(),
                                       ),
-                                      items: AppConstants.paymentMethods.map((method) {
+                                      items: AppConstants.paymentMethods.map((
+                                        method,
+                                      ) {
                                         return DropdownMenuItem(
                                           value: method,
-                                          child: Text(AppConstants.paymentMethodLabels[method]!),
+                                          child: Text(
+                                            AppConstants
+                                                .paymentMethodLabels[method]!,
+                                          ),
                                         );
                                       }).toList(),
                                       onChanged: (value) {
@@ -881,14 +985,15 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                       keyboardType: TextInputType.number,
                                       initialValue: _paidAmount.toString(),
                                       onChanged: (value) {
-                                        _paidAmount = double.tryParse(value) ?? 0;
+                                        _paidAmount =
+                                            double.tryParse(value) ?? 0;
                                       },
                                     ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 16),
-                              
+
                               // Notes
                               TextFormField(
                                 decoration: const InputDecoration(
@@ -901,26 +1006,31 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                 },
                               ),
                               const SizedBox(height: 24),
-                              
+
                               // Total and submit
                               Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                                  color: AppTheme.primaryColor.withValues(
+                                    alpha: 0.1,
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Column(
                                   children: [
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
                                           'Tổng tiền:',
                                           style: AppTheme.heading3,
                                         ),
                                         Text(
-                                          NumberFormat.currency(locale: 'vi', symbol: 'đ')
-                                              .format(_totalAmount),
+                                          NumberFormat.currency(
+                                            locale: 'vi',
+                                            symbol: 'đ',
+                                          ).format(_totalAmount),
                                           style: AppTheme.heading2.copyWith(
                                             color: AppTheme.primaryColor,
                                           ),
@@ -930,12 +1040,18 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                     if (_paidAmount > 0) ...[
                                       const SizedBox(height: 8),
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Text('Đã trả:', style: AppTheme.bodyMedium),
                                           Text(
-                                            NumberFormat.currency(locale: 'vi', symbol: 'đ')
-                                                .format(_paidAmount),
+                                            'Đã trả:',
+                                            style: AppTheme.bodyMedium,
+                                          ),
+                                          Text(
+                                            NumberFormat.currency(
+                                              locale: 'vi',
+                                              symbol: 'đ',
+                                            ).format(_paidAmount),
                                             style: AppTheme.bodyMedium.copyWith(
                                               fontWeight: FontWeight.w600,
                                             ),
@@ -943,12 +1059,20 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                         ],
                                       ),
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Text('Còn lại:', style: AppTheme.bodyMedium),
                                           Text(
-                                            NumberFormat.currency(locale: 'vi', symbol: 'đ')
-                                                .format(_totalAmount - _paidAmount),
+                                            'Còn lại:',
+                                            style: AppTheme.bodyMedium,
+                                          ),
+                                          Text(
+                                            NumberFormat.currency(
+                                              locale: 'vi',
+                                              symbol: 'đ',
+                                            ).format(
+                                              _totalAmount - _paidAmount,
+                                            ),
                                             style: AppTheme.bodyMedium.copyWith(
                                               fontWeight: FontWeight.w600,
                                               color: AppTheme.errorColor,
@@ -962,7 +1086,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                       children: [
                                         Expanded(
                                           child: OutlinedButton(
-                                            onPressed: () => context.go('/orders'),
+                                            onPressed: () =>
+                                                context.go('/orders'),
                                             child: const Text('Hủy'),
                                           ),
                                         ),
@@ -974,7 +1099,10 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                                             icon: const Icon(Icons.check),
                                             label: const Text('Tạo đơn hàng'),
                                             style: ElevatedButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(vertical: 16),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 16,
+                                                  ),
                                             ),
                                           ),
                                         ),
@@ -1001,7 +1129,7 @@ class OrderItemData {
   int quantity;
   double unitPrice;
   double subtotal;
-  
+
   OrderItemData({
     required this.service,
     required this.quantity,

@@ -32,11 +32,7 @@ class AppConstants {
   static const String roleManager = 'manager';
   static const String roleEmployee = 'employee';
 
-  static const List<String> userRoles = [
-    roleAdmin,
-    roleManager,
-    roleEmployee,
-  ];
+  static const List<String> userRoles = [roleAdmin, roleManager, roleEmployee];
 
   static const Map<String, String> roleLabels = {
     roleAdmin: 'Quản trị viên',
@@ -47,15 +43,21 @@ class AppConstants {
   // Payment Methods
   static const String paymentCash = 'cash';
   static const String paymentBankTransfer = 'bank_transfer';
+  static const String paymentMomo = 'momo';
+  static const String paymentZaloPay = 'zalopay';
 
   static const List<String> paymentMethods = [
     paymentCash,
     paymentBankTransfer,
+    paymentMomo,
+    paymentZaloPay,
   ];
 
   static const Map<String, String> paymentMethodLabels = {
     paymentCash: 'Tiền mặt',
     paymentBankTransfer: 'Chuyển khoản',
+    paymentMomo: 'MoMo',
+    paymentZaloPay: 'ZaloPay',
   };
 
   // Transaction Types
@@ -72,11 +74,7 @@ class AppConstants {
   static const String unitItem = 'item';
   static const String unitSet = 'set';
 
-  static const List<String> serviceUnits = [
-    unitKg,
-    unitItem,
-    unitSet,
-  ];
+  static const List<String> serviceUnits = [unitKg, unitItem, unitSet];
 
   static const Map<String, String> serviceUnitLabels = {
     unitKg: 'Kg',
