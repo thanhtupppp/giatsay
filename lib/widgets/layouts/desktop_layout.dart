@@ -194,68 +194,105 @@ class _Header extends StatelessWidget {
   }
 }
 
-class AppSidebar extends StatelessWidget {
+class AppSidebar extends StatefulWidget {
   const AppSidebar({super.key});
+
+  @override
+  State<AppSidebar> createState() => _AppSidebarState();
+}
+
+class _AppSidebarState extends State<AppSidebar>
+    with SingleTickerProviderStateMixin {
+  bool _isCollapsed = false;
+  bool _autoCollapsed = false;
+
+  static const double _expandedWidth = 220;
+  static const double _collapsedWidth = 65;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final size = MediaQuery.of(context).size;
+    final aspectRatio = size.width / size.height;
+
+    // Auto-collapse on square screens (POS) or small widths
+    final shouldAutoCollapse = aspectRatio <= 1.3 || size.width < 1100;
+
+    if (shouldAutoCollapse && !_autoCollapsed) {
+      _isCollapsed = true;
+      _autoCollapsed = true;
+    } else if (!shouldAutoCollapse && _autoCollapsed) {
+      _isCollapsed = false;
+      _autoCollapsed = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final currentRoute = GoRouterState.of(context).matchedLocation;
+    final isCompact = _isCollapsed;
 
-    // Check screen width for responsiveness
-    final bool isCompact = MediaQuery.of(context).size.width < 1000;
-
-    return Container(
-      width: isCompact ? 70 : 250,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      width: isCompact ? _collapsedWidth : _expandedWidth,
       color: AppTheme.primaryDark,
       child: Column(
         children: [
-          // App logo/title
-          Container(
-            height: 64,
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            alignment: isCompact ? Alignment.center : Alignment.centerLeft,
-            decoration: BoxDecoration(
-              color: AppTheme
-                  .primaryColor, // Slightly lighter brand color for logo area
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  offset: const Offset(0, 2),
-                  blurRadius: 4,
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: isCompact
-                  ? MainAxisAlignment.center
-                  : MainAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.local_laundry_service,
-                  color: Colors.white,
-                  size: 28,
-                ),
-                if (!isCompact) ...[
-                  const SizedBox(width: 12),
-                  const Text(
-                    'LAUNDRY',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
+          // App logo/title - click to toggle sidebar
+          Material(
+            color: AppTheme.primaryColor,
+            child: InkWell(
+              onTap: () => setState(() => _isCollapsed = !_isCollapsed),
+              child: Container(
+                height: 64,
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                alignment: isCompact ? Alignment.center : Alignment.centerLeft,
+                decoration: BoxDecoration(
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      offset: const Offset(0, 2),
+                      blurRadius: 4,
                     ),
-                  ),
-                ],
-              ],
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: isCompact
+                      ? MainAxisAlignment.center
+                      : MainAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.local_laundry_service,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                    if (!isCompact) ...[
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'GIẶT SẤY',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
 
           // Menu items
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
                 _buildMenuItem(
                   context,
@@ -351,6 +388,14 @@ class AppSidebar extends StatelessWidget {
                     isActive: currentRoute.startsWith('/settings'),
                     isCompact: isCompact,
                   ),
+                  _buildMenuItem(
+                    context,
+                    icon: Icons.analytics,
+                    label: 'Báo cáo doanh số',
+                    route: '/reports/revenue',
+                    isActive: currentRoute == '/reports/revenue',
+                    isCompact: isCompact,
+                  ),
                 ],
                 _buildGroupHeader('NHÂN VIÊN', isCompact),
                 _buildMenuItem(
@@ -361,31 +406,66 @@ class AppSidebar extends StatelessWidget {
                   isActive: currentRoute.startsWith('/shifts'),
                   isCompact: isCompact,
                 ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.summarize,
+                  label: 'Báo cáo ca',
+                  route: '/reports/shift',
+                  isActive: currentRoute == '/reports/shift',
+                  isCompact: isCompact,
+                ),
               ],
             ),
           ),
 
-          // Version/Footer
-          if (!isCompact)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'v1.0.0',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  fontSize: 12,
+          // Toggle collapse button
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => setState(() => _isCollapsed = !_isCollapsed),
+              child: Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    AnimatedRotation(
+                      duration: const Duration(milliseconds: 200),
+                      turns: _isCollapsed ? 0.5 : 0,
+                      child: Icon(
+                        Icons.chevron_left,
+                        color: Colors.white.withValues(alpha: 0.6),
+                        size: 22,
+                      ),
+                    ),
+                    if (!isCompact) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        'Thu gọn',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildGroupHeader(String title, bool isCompact) {
-    if (isCompact) return const SizedBox(height: 16);
+    if (isCompact) return const SizedBox(height: 12);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 24, 16, 8),
+      padding: const EdgeInsets.fromLTRB(20, 20, 12, 6),
       child: Text(
         title,
         style: TextStyle(
@@ -406,58 +486,66 @@ class AppSidebar extends StatelessWidget {
     required bool isActive,
     required bool isCompact,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => context.go(route),
-        child: Container(
-          height: 50,
-          padding: EdgeInsets.symmetric(horizontal: isCompact ? 0 : 24),
-          decoration: BoxDecoration(
-            border: isActive
-                ? const Border(left: BorderSide(color: Colors.white, width: 4))
-                : null,
-            gradient: isActive
-                ? LinearGradient(
-                    colors: [
-                      Colors.white.withValues(alpha: 0.1),
-                      Colors.transparent,
-                    ],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  )
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: isCompact
-                ? MainAxisAlignment.center
-                : MainAxisAlignment.start,
-            children: [
-              Icon(
-                icon,
-                color: isActive
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: 0.7),
-                size: 22,
-              ),
-              if (!isCompact) ...[
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: isActive
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.7),
-                      fontSize: 14,
-                      fontWeight: isActive
-                          ? FontWeight.w600
-                          : FontWeight.normal,
+    return Tooltip(
+      message: isCompact ? label : '',
+      preferBelow: false,
+      waitDuration: const Duration(milliseconds: 300),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.go(route),
+          child: Container(
+            height: 44,
+            padding: EdgeInsets.symmetric(horizontal: isCompact ? 0 : 20),
+            decoration: BoxDecoration(
+              border: isActive
+                  ? const Border(
+                      left: BorderSide(color: Colors.white, width: 3),
+                    )
+                  : null,
+              gradient: isActive
+                  ? LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.1),
+                        Colors.transparent,
+                      ],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    )
+                  : null,
+            ),
+            child: Row(
+              mainAxisAlignment: isCompact
+                  ? MainAxisAlignment.center
+                  : MainAxisAlignment.start,
+              children: [
+                Icon(
+                  icon,
+                  color: isActive
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.7),
+                  size: 20,
+                ),
+                if (!isCompact) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isActive
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.7),
+                        fontSize: 13,
+                        fontWeight: isActive
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

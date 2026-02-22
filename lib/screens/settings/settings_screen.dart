@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 
 import '../../core/services/auth_service.dart';
 import '../../core/services/print_service.dart';
+import '../../core/database/database_helper.dart'; // Import DatabaseHelper
 import '../../repositories/user_repository.dart';
 import '../../models/user.dart';
 import '../../models/order.dart';
@@ -203,6 +204,175 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       if (mounted) {
         showAppAlertDialog(context, title: 'Lỗi', content: 'Lỗi khôi phục: $e');
+      }
+    }
+  }
+
+  Future<void> _resetDatabase() async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Xóa toàn bộ dữ liệu',
+      content:
+          'Hành động này sẽ XÓA SẠCH toàn bộ đơn hàng, khách hàng, và báo cáo. Dữ liệu KHÔNG THỂ khôi phục (trừ khi bạn đã backup).\n\nBạn có chắc chắn muốn xóa?',
+      confirmText: 'XÓA SẠCH',
+      confirmColor: AppTheme.errorColor,
+    );
+
+    if (confirmed != true) return;
+
+    // Yêu cầu nhập mật khẩu xác nhận "DELETE"
+    if (!mounted) return;
+    final passwordConfirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        final passwordController = TextEditingController();
+        String? errorText;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.lock_outline,
+                    color: AppTheme.errorColor,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Xác nhận xóa dữ liệu',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.errorColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppTheme.errorColor.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: AppTheme.errorColor,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Nhập DELETE để xác nhận xóa toàn bộ dữ liệu',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: passwordController,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: 'Mật khẩu xác nhận',
+                      hintText: 'Nhập DELETE',
+                      errorText: errorText,
+                      prefixIcon: const Icon(Icons.key),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: AppTheme.errorColor,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                    onSubmitted: (_) {
+                      if (passwordController.text.trim() == 'DELETE') {
+                        Navigator.of(dialogContext).pop(true);
+                      } else {
+                        setState(() {
+                          errorText =
+                              'Mật khẩu không đúng! Vui lòng nhập DELETE';
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Hủy'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.errorColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () {
+                    if (passwordController.text.trim() == 'DELETE') {
+                      Navigator.of(dialogContext).pop(true);
+                    } else {
+                      setState(() {
+                        errorText = 'Mật khẩu không đúng! Vui lòng nhập DELETE';
+                      });
+                    }
+                  },
+                  child: const Text('Xác nhận xóa'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (passwordConfirmed != true) return;
+
+    try {
+      await DatabaseHelper.instance.clearAllData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Đã xóa sạch dữ liệu thành công!'),
+              ],
+            ),
+            backgroundColor: AppTheme.successColor,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        _loadCurrentUser();
+      }
+    } catch (e) {
+      if (mounted) {
+        showAppAlertDialog(
+          context,
+          title: 'Lỗi',
+          content: 'Lỗi xóa dữ liệu: $e',
+        );
       }
     }
   }
@@ -633,6 +803,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
+                      const SizedBox(height: 16),
                       Row(
                         children: [
                           PrimaryButton(
@@ -646,6 +817,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             onPressed: _restoreDatabase,
                             icon: Icons.upload,
                             label: 'Khôi phục',
+                          ),
+                          const Spacer(),
+                          PrimaryButton(
+                            onPressed: _resetDatabase,
+                            icon: Icons.delete_forever,
+                            label: 'Xóa dữ liệu',
+                            backgroundColor: AppTheme.errorColor,
                           ),
                         ],
                       ),

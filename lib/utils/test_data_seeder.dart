@@ -1,7 +1,7 @@
-
 import '../../repositories/customer_repository.dart';
 import '../../repositories/service_repository.dart';
 import '../../repositories/order_repository.dart';
+import '../../repositories/user_repository.dart';
 import '../../models/customer.dart';
 import '../../models/order.dart';
 import '../../models/order_item.dart';
@@ -12,48 +12,60 @@ class TestDataSeeder {
     final customerRepo = CustomerRepository();
     final serviceRepo = ServiceRepository();
     final orderRepo = OrderRepository();
-    
+
     // Check if data already exists
     final existingCustomers = await customerRepo.getAll();
     if (existingCustomers.isNotEmpty) {
       // print('Test data already exists');
       return;
     }
-    
+
     // print('Seeding test data...');
-    
+
     // Create test customers
-    final customer1Id = await customerRepo.create(Customer(
-      name: 'Nguyễn Văn A',
-      phone: '0901234567',
-      address: '123 Đường ABC, Quận 1, TP.HCM',
-      email: 'nguyenvana@email.com',
-    ));
-    
-    final customer2Id = await customerRepo.create(Customer(
-      name: 'Trần Thị B',
-      phone: '0907654321',
-      address: '456 Đường XYZ, Quận 2, TP.HCM',
-    ));
-    
-    final customer3Id = await customerRepo.create(Customer(
-      name: 'Lê Văn C',
-      phone: '0903456789',
-      address: '789 Đường DEF, Quận 3, TP.HCM',
-      email: 'levanc@email.com',
-      notes: 'Khách hàng VIP',
-    ));
-    
+    final customer1Id = await customerRepo.create(
+      Customer(
+        name: 'Nguyễn Văn A',
+        phone: '0901234567',
+        address: '123 Đường ABC, Quận 1, TP.HCM',
+        email: 'nguyenvana@email.com',
+      ),
+    );
+
+    final customer2Id = await customerRepo.create(
+      Customer(
+        name: 'Trần Thị B',
+        phone: '0907654321',
+        address: '456 Đường XYZ, Quận 2, TP.HCM',
+      ),
+    );
+
+    final customer3Id = await customerRepo.create(
+      Customer(
+        name: 'Lê Văn C',
+        phone: '0903456789',
+        address: '789 Đường DEF, Quận 3, TP.HCM',
+        email: 'levanc@email.com',
+        notes: 'Khách hàng VIP',
+      ),
+    );
+
     // Get services
     final services = await serviceRepo.getAll();
     if (services.isEmpty) {
       // print('No services found');
       return;
     }
-    
-    // Get admin user (should be ID 1)
-    final employeeId = 1;
-    
+
+    // Get admin user (dynamically)
+    final userRepo = UserRepository();
+    final users = await userRepo.getAll();
+    if (users.isEmpty) {
+      // print('No users found');
+      return;
+    }
+    final employeeId = users.first.id!;
+
     // Create test orders
     // Order 1: Received status
     await orderRepo.createOrderWithCode(
@@ -85,7 +97,7 @@ class TestDataSeeder {
         ),
       ],
     );
-    
+
     // Order 2: Washing status
     await orderRepo.createOrderWithCode(
       Order(
@@ -117,7 +129,7 @@ class TestDataSeeder {
         ),
       ],
     );
-    
+
     // Order 3: Washed status
     await orderRepo.createOrderWithCode(
       Order(
@@ -142,7 +154,7 @@ class TestDataSeeder {
         ),
       ],
     );
-    
+
     // Order 4: Delivered status
     await orderRepo.createOrderWithCode(
       Order(
@@ -175,7 +187,7 @@ class TestDataSeeder {
         ),
       ],
     );
-    
+
     // print('Test data seeded successfully!');
     // print('Created ${3} customers');
     // print('Created ${4} orders');

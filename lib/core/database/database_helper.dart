@@ -25,10 +25,10 @@ class DatabaseHelper {
 
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final dbPath = join(documentsDirectory.path, 'LaundryManagement');
-    
+
     // Create directory if it doesn't exist
     await Directory(dbPath).create(recursive: true);
-    
+
     final path = join(dbPath, AppConstants.dbName);
 
     return await openDatabase(
@@ -250,10 +250,18 @@ class DatabaseHelper {
     await db.execute('CREATE INDEX idx_orders_employee ON orders(employee_id)');
     await db.execute('CREATE INDEX idx_orders_status ON orders(status)');
     await db.execute('CREATE INDEX idx_orders_date ON orders(received_date)');
-    await db.execute('CREATE INDEX idx_order_items_order ON order_items(order_id)');
-    await db.execute('CREATE INDEX idx_transactions_date ON transactions(transaction_date)');
-    await db.execute('CREATE INDEX idx_transactions_type ON transactions(type)');
-    await db.execute('CREATE INDEX idx_salaries_employee ON salaries(employee_id)');
+    await db.execute(
+      'CREATE INDEX idx_order_items_order ON order_items(order_id)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_transactions_date ON transactions(transaction_date)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_transactions_type ON transactions(type)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_salaries_employee ON salaries(employee_id)',
+    );
     await db.execute('CREATE INDEX idx_salaries_month ON salaries(month)');
 
     // Insert default admin user (password: admin123)
@@ -347,7 +355,7 @@ class DatabaseHelper {
     final password = 'admin123';
     final passwordBytes = utf8.encode(password);
     final passwordHash = sha256.convert(passwordBytes).toString();
-    
+
     await db.insert('users', {
       'username': 'admin',
       'password_hash': passwordHash,
@@ -363,7 +371,7 @@ class DatabaseHelper {
 
   Future<void> _createDefaultServices(Database db) async {
     final now = DateTime.now().toIso8601String();
-    
+
     final defaultServices = [
       {
         'name': 'Giặt thường',
@@ -466,7 +474,10 @@ class DatabaseHelper {
     return await db.delete(table, where: where, whereArgs: whereArgs);
   }
 
-  Future<List<Map<String, dynamic>>> rawQuery(String sql, [List<dynamic>? arguments]) async {
+  Future<List<Map<String, dynamic>>> rawQuery(
+    String sql, [
+    List<dynamic>? arguments,
+  ]) async {
     final db = await database;
     return await db.rawQuery(sql, arguments);
   }
@@ -480,14 +491,18 @@ class DatabaseHelper {
   Future<String> backupDatabase() async {
     final db = await database;
     final dbPath = db.path;
-    
+
     final documentsDirectory = await getApplicationDocumentsDirectory();
-    final backupDirectory = join(documentsDirectory.path, 'LaundryManagement', 'Backups');
+    final backupDirectory = join(
+      documentsDirectory.path,
+      'LaundryManagement',
+      'Backups',
+    );
     await Directory(backupDirectory).create(recursive: true);
-    
+
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
     final backupPath = join(backupDirectory, 'backup_$timestamp.db');
-    
+
     await File(dbPath).copy(backupPath);
     return backupPath;
   }
@@ -496,10 +511,10 @@ class DatabaseHelper {
   Future<void> restoreDatabase(String backupPath) async {
     final db = await database;
     final dbPath = db.path;
-    
+
     await db.close();
     await File(backupPath).copy(dbPath);
-    
+
     _database = null;
     await database; // Reinitialize
   }
@@ -512,17 +527,31 @@ class DatabaseHelper {
   }
 
   // Clear all data (for testing)
+  // Clear all data (for testing)
   Future<void> clearAllData() async {
     final db = await database;
+
+    // 1. Child tables (refers to others)
     await db.delete('order_items');
-    await db.delete('orders');
     await db.delete('transactions');
+    await db.delete('maintenance_records');
+    await db.delete('timesheets');
     await db.delete('salaries');
+
+    // 2. Middle tables
+    await db.delete('orders');
+    await db.delete('assets');
+
+    // 3. Parent tables
     await db.delete('customers');
     await db.delete('services');
-    await db.delete('assets');
+    await db.delete('materials');
+    await db.delete('work_shifts');
     await db.delete('users');
-    
+
+    // 4. Reset auto-increment counters
+    await db.delete('sqlite_sequence');
+
     // Recreate default admin
     await _createDefaultAdmin(db);
     await _createDefaultServices(db);

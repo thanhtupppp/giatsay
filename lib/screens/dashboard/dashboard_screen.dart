@@ -8,7 +8,7 @@ import '../../repositories/order_repository.dart';
 import '../../repositories/customer_repository.dart';
 import '../../config/theme.dart';
 import '../../config/constants.dart';
-import '../../utils/test_data_seeder.dart';
+
 import '../../widgets/layouts/desktop_layout.dart';
 import '../../widgets/ui/cards.dart';
 
@@ -43,7 +43,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _initializeData() async {
-    await TestDataSeeder.seedTestData();
     await _loadDashboardData();
   }
 

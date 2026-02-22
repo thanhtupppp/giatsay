@@ -46,8 +46,8 @@ class OrderRepository {
       }
     }
 
-    // Tăng lên 1
-    return (lastBarcode + 1).toString();
+    // Tăng lên 1 và format thành chuỗi 10 ký tự (0000000001)
+    return (lastBarcode + 1).toString().padLeft(10, '0');
   }
 
   Future<int> create(Order order, List<OrderItem> items) async {
@@ -402,6 +402,91 @@ class OrderRepository {
       WHERE DATE(received_date) BETWEEN ? AND ?
       GROUP BY DATE(received_date)
       ORDER BY date
+    ''',
+      [
+        DateFormat('yyyy-MM-dd').format(startDate),
+        DateFormat('yyyy-MM-dd').format(endDate),
+      ],
+    );
+  }
+
+  /// Báo cáo doanh thu ca: tổng hợp theo nhân viên & phương thức thanh toán
+  Future<List<Map<String, dynamic>>> getShiftRevenue({
+    required DateTime date,
+    int? employeeId,
+  }) async {
+    String where = 'DATE(o.received_date) = ?';
+    List<dynamic> whereArgs = [DateFormat('yyyy-MM-dd').format(date)];
+
+    if (employeeId != null) {
+      where += ' AND o.employee_id = ?';
+      whereArgs.add(employeeId);
+    }
+
+    return await _db.rawQuery('''
+      SELECT 
+        o.employee_id,
+        u.full_name as employee_name,
+        o.payment_method,
+        COUNT(*) as order_count,
+        COALESCE(SUM(o.paid_amount), 0) as total_paid,
+        COALESCE(SUM(o.total_amount), 0) as total_amount
+      FROM orders o
+      INNER JOIN users u ON o.employee_id = u.id
+      WHERE $where
+      GROUP BY o.employee_id, o.payment_method
+      ORDER BY u.full_name, o.payment_method
+    ''', whereArgs);
+  }
+
+  /// Danh sách đơn hàng chi tiết cho báo cáo ca
+  Future<List<Map<String, dynamic>>> getShiftOrderDetails({
+    required DateTime date,
+    int? employeeId,
+  }) async {
+    String where = 'DATE(o.received_date) = ?';
+    List<dynamic> whereArgs = [DateFormat('yyyy-MM-dd').format(date)];
+
+    if (employeeId != null) {
+      where += ' AND o.employee_id = ?';
+      whereArgs.add(employeeId);
+    }
+
+    return await _db.rawQuery('''
+      SELECT 
+        o.*,
+        c.name as customer_name,
+        c.phone as customer_phone,
+        u.full_name as employee_name
+      FROM orders o
+      INNER JOIN customers c ON o.customer_id = c.id
+      INNER JOIN users u ON o.employee_id = u.id
+      WHERE $where
+      ORDER BY o.created_at DESC
+    ''', whereArgs);
+  }
+
+  /// Báo cáo doanh số theo nhân viên cho admin (theo khoảng ngày)
+  Future<List<Map<String, dynamic>>> getEmployeeRevenueReport({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    return await _db.rawQuery(
+      '''
+      SELECT 
+        o.employee_id,
+        u.full_name as employee_name,
+        COUNT(*) as order_count,
+        COALESCE(SUM(o.total_amount), 0) as total_amount,
+        COALESCE(SUM(o.paid_amount), 0) as total_paid,
+        COALESCE(SUM(CASE WHEN o.payment_method = 'cash' THEN o.paid_amount ELSE 0 END), 0) as cash_amount,
+        COALESCE(SUM(CASE WHEN o.payment_method = 'bank_transfer' THEN o.paid_amount ELSE 0 END), 0) as transfer_amount,
+        COALESCE(SUM(CASE WHEN o.payment_method IN ('momo', 'zalopay') THEN o.paid_amount ELSE 0 END), 0) as ewallet_amount
+      FROM orders o
+      INNER JOIN users u ON o.employee_id = u.id
+      WHERE DATE(o.received_date) BETWEEN ? AND ?
+      GROUP BY o.employee_id
+      ORDER BY total_paid DESC
     ''',
       [
         DateFormat('yyyy-MM-dd').format(startDate),

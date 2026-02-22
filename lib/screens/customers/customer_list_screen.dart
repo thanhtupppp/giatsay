@@ -12,6 +12,8 @@ import '../../widgets/ui/cards.dart';
 import '../../widgets/ui/buttons.dart';
 import '../../widgets/ui/inputs.dart';
 
+import '../../widgets/ui/dialogs.dart'; // Import dialogs
+
 class CustomerListScreen extends StatefulWidget {
   const CustomerListScreen({super.key});
 
@@ -300,7 +302,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           ),
           DataColumn2(
             label: Text('THAO TÁC', style: _headerStyle),
-            fixedWidth: 100,
+            fixedWidth: 150,
           ),
         ],
         rows: _filteredCustomers.map((customer) {
@@ -364,6 +366,15 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                         color: Colors.grey[600],
                         onPressed: () =>
                             context.go('/customers/${customer.id}'),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Tooltip(
+                      message: "Xóa khách hàng",
+                      child: IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        color: AppTheme.errorColor,
+                        onPressed: () => _deleteCustomer(customer),
                       ),
                     ),
                   ],
@@ -610,6 +621,48 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           ? await _customerRepo.update(newCustomer)
           : await _customerRepo.create(newCustomer);
       _loadCustomers();
+    }
+  }
+
+  Future<void> _deleteCustomer(Customer customer) async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Xóa khách hàng',
+      content:
+          'Bạn có chắc chắn muốn xóa khách hàng "${customer.name}"?\n\nLưu ý: Chỉ có thể xóa khách hàng chưa có đơn hàng nào.',
+      confirmText: 'Xóa',
+      confirmColor: AppTheme.errorColor,
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _customerRepo.delete(customer.id!);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã xóa khách hàng thành công'),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
+        _loadCustomers();
+      }
+    } catch (e) {
+      if (mounted) {
+        // Check for FK constraint error (usually contains code 787 or similar message)
+        final isConstraintError =
+            e.toString().contains('FOREIGN KEY') ||
+            e.toString().contains('constraint failed');
+
+        showAppAlertDialog(
+          context,
+          title: 'Không thể xóa',
+          content: isConstraintError
+              ? 'Khách hàng này đã có lịch sử đơn hàng. Không thể xóa để bảo đảm dữ liệu.'
+              : 'Lỗi khi xóa: $e',
+        );
+      }
     }
   }
 }

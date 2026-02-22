@@ -74,10 +74,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
           (order['customer_name'] as String?)?.toLowerCase() ?? '';
       final customerPhone =
           (order['customer_phone'] as String?)?.toLowerCase() ?? '';
+      final employeeName =
+          (order['employee_name'] as String?)?.toLowerCase() ?? '';
 
       return orderCode.contains(query) ||
           customerName.contains(query) ||
-          customerPhone.contains(query);
+          customerPhone.contains(query) ||
+          employeeName.contains(query);
     }).toList();
   }
 
@@ -180,7 +183,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   flex: 5,
                   child: AppTextField(
                     label: 'Tìm kiếm',
-                    hintText: 'Nhập mã đơn, tên khách hàng, số điện thoại...',
+                    hintText: 'Nhập mã đơn, tên khách hàng, SĐT, nhân viên...',
                     prefixIcon: Icons.search,
                     onChanged: (value) {
                       setState(() {
@@ -270,6 +273,15 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                 ),
                                 const DataColumn2(
                                   label: Text(
+                                    'NHÂN VIÊN',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  size: ColumnSize.M,
+                                ),
+                                const DataColumn2(
+                                  label: Text(
                                     'NGÀY NHẬN',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
@@ -339,6 +351,30 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                     ),
                                     DataCell(
                                       Text(order['customer_phone'] as String),
+                                    ),
+                                    DataCell(
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.person_outline,
+                                            size: 16,
+                                            color: AppTheme.textSecondary,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              (order['employee_name']
+                                                      as String?) ??
+                                                  'N/A',
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: AppTheme.textPrimary,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                     DataCell(
                                       Text(

@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:barcode/barcode.dart';
@@ -12,6 +13,24 @@ class PrintService {
   static final PrintService instance = PrintService._init();
   PrintService._init();
 
+  // Cached fonts to avoid reloading
+  pw.Font? _fontRegular;
+  pw.Font? _fontBold;
+  pw.Font? _fontItalic;
+
+  /// Load bundled NotoSans fonts from assets (works offline on POS)
+  Future<({pw.Font regular, pw.Font bold, pw.Font italic})> _loadFonts() async {
+    _fontRegular ??= pw.Font.ttf(
+      await rootBundle.load('assets/fonts/NotoSans-Regular.ttf'),
+    );
+    // Variable font: same file supports bold weight
+    _fontBold ??= _fontRegular;
+    _fontItalic ??= pw.Font.ttf(
+      await rootBundle.load('assets/fonts/NotoSans-Italic.ttf'),
+    );
+    return (regular: _fontRegular!, bold: _fontBold!, italic: _fontItalic!);
+  }
+
   Future<Uint8List> generateBarcodeLabel(
     Order order,
     Customer customer,
@@ -19,16 +38,9 @@ class PrintService {
   ) async {
     final pdf = pw.Document();
 
-    final font = await PdfGoogleFonts.robotoRegular();
-    final fontBold = await PdfGoogleFonts.robotoBold();
-
-    // Create barcode
-    final barcodeGenerator = Barcode.code128();
-    final barcodeSvg = barcodeGenerator.toSvg(
-      order.barcode,
-      width: AppConstants.labelWidth * PdfPageFormat.mm,
-      height: 25,
-    );
+    final fonts = await _loadFonts();
+    final font = fonts.regular;
+    final fontBold = fonts.bold;
 
     pdf.addPage(
       pw.Page(
@@ -85,11 +97,15 @@ class PrintService {
 
               pw.SizedBox(height: 1),
 
-              // Barcode
+              // Barcode - dùng BarcodeWidget thay SvgImage cho đáng tin cậy hơn
               pw.Center(
-                child: pw.SvgImage(
-                  svg: barcodeSvg,
+                child: pw.BarcodeWidget(
+                  barcode: Barcode.code128(),
+                  data: order.barcode,
                   width: AppConstants.labelWidth * 0.9 * PdfPageFormat.mm,
+                  height: 12 * PdfPageFormat.mm,
+                  drawText: true,
+                  textStyle: const pw.TextStyle(fontSize: 6),
                 ),
               ),
             ],
@@ -192,9 +208,10 @@ class PrintService {
   }) async {
     final pdf = pw.Document();
 
-    final font = await PdfGoogleFonts.robotoRegular();
-    final fontBold = await PdfGoogleFonts.robotoBold();
-    final fontItalic = await PdfGoogleFonts.robotoItalic();
+    final fonts = await _loadFonts();
+    final font = fonts.regular;
+    final fontBold = fonts.bold;
+    final fontItalic = fonts.italic;
 
     pdf.addPage(
       pw.Page(
@@ -378,8 +395,8 @@ class PrintService {
                 child: pw.BarcodeWidget(
                   barcode: Barcode.code128(),
                   data: order.barcode,
-                  width: 35 * PdfPageFormat.mm, // Giảm width barcode để gọn hơn
-                  height: 10 * PdfPageFormat.mm,
+                  width: 50 * PdfPageFormat.mm,
+                  height: 15 * PdfPageFormat.mm,
                   drawText: true,
                   textStyle: const pw.TextStyle(fontSize: 7),
                 ),
@@ -432,12 +449,219 @@ class PrintService {
         pageFormat: pageFormat,
       );
 
-      await Printing.layoutPdf(
-        onLayout: (format) async => pdfData,
-        name: 'Order_${order.orderCode}_Receipt',
-      );
+      await _directPrint(pdfData, 'Order_${order.orderCode}_Receipt');
     } catch (e) {
       rethrow;
     }
+  }
+
+  /// In báo cáo doanh thu ca làm việc
+  Future<void> printShiftReport({
+    required DateTime date,
+    required String employeeName,
+    required double cashTotal,
+    required double transferTotal,
+    required double eWalletTotal,
+    required double grandTotal,
+    required int orderCount,
+    required double unpaidTotal,
+    required List<Map<String, dynamic>> orders,
+    bool isAllEmployees = false,
+  }) async {
+    final pdf = pw.Document();
+
+    final fonts = await _loadFonts();
+    final font = fonts.regular;
+    final fontBold = fonts.bold;
+
+    final currencyFormat = NumberFormat.currency(locale: 'vi', symbol: 'đ');
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.roll80,
+        theme: pw.ThemeData.withFont(base: font, bold: fontBold),
+        margin: const pw.EdgeInsets.only(
+          left: 4 * PdfPageFormat.mm,
+          right: 8 * PdfPageFormat.mm,
+        ),
+        build: (context) {
+          final smallStyle = const pw.TextStyle(fontSize: 8);
+          final mediumStyle = pw.TextStyle(
+            fontSize: 9,
+            fontWeight: pw.FontWeight.bold,
+          );
+          final titleStyle = pw.TextStyle(
+            fontSize: 11,
+            fontWeight: pw.FontWeight.bold,
+          );
+
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.SizedBox(height: 5),
+
+              // Title
+              pw.Center(
+                child: pw.Text('BÁO CÁO DOANH THU CA', style: titleStyle),
+              ),
+              pw.SizedBox(height: 3),
+              pw.Center(
+                child: pw.Text(
+                  'Ngày: ${DateFormat('dd/MM/yyyy').format(date)}',
+                  style: smallStyle,
+                ),
+              ),
+              pw.Center(
+                child: pw.Text(
+                  isAllEmployees ? 'Tất cả nhân viên' : 'NV: $employeeName',
+                  style: mediumStyle,
+                ),
+              ),
+
+              pw.SizedBox(height: 4),
+              pw.Divider(thickness: 0.5),
+              pw.SizedBox(height: 2),
+
+              // Payment breakdown
+              _buildReportRow(
+                'Tiền mặt:',
+                currencyFormat.format(cashTotal),
+                smallStyle,
+              ),
+              _buildReportRow(
+                'Chuyển khoản:',
+                currencyFormat.format(transferTotal),
+                smallStyle,
+              ),
+              _buildReportRow(
+                'Ví điện tử:',
+                currencyFormat.format(eWalletTotal),
+                smallStyle,
+              ),
+
+              pw.SizedBox(height: 2),
+              pw.Divider(thickness: 0.5),
+
+              _buildReportRow(
+                'TỔNG THU:',
+                currencyFormat.format(grandTotal),
+                mediumStyle,
+              ),
+              _buildReportRow('Số đơn:', '$orderCount', smallStyle),
+              if (unpaidTotal > 0)
+                _buildReportRow(
+                  'Chưa thu:',
+                  currencyFormat.format(unpaidTotal),
+                  smallStyle,
+                ),
+
+              pw.SizedBox(height: 4),
+              pw.Divider(thickness: 0.5),
+              pw.SizedBox(height: 2),
+
+              // Order list
+              pw.Text('CHI TIẾT ĐƠN HÀNG:', style: mediumStyle),
+              pw.SizedBox(height: 2),
+              ...orders.map((order) {
+                final paymentLabel =
+                    AppConstants.paymentMethodLabels[order['payment_method']
+                        as String?] ??
+                    'Chưa TT';
+                return pw.Padding(
+                  padding: const pw.EdgeInsets.symmetric(vertical: 1),
+                  child: pw.Row(
+                    children: [
+                      pw.Expanded(
+                        flex: 2,
+                        child: pw.Text(
+                          '${order['order_code']}',
+                          style: smallStyle,
+                        ),
+                      ),
+                      pw.Expanded(
+                        flex: 2,
+                        child: pw.Text(
+                          '${order['customer_name']}',
+                          style: smallStyle,
+                        ),
+                      ),
+                      pw.Container(
+                        width: 30,
+                        child: pw.Text(paymentLabel, style: smallStyle),
+                      ),
+                      pw.Container(
+                        width: 45,
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Text(
+                          currencyFormat.format(
+                            (order['paid_amount'] as num).toDouble(),
+                          ),
+                          style: smallStyle,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+
+              pw.SizedBox(height: 4),
+              pw.Divider(thickness: 0.5),
+              pw.SizedBox(height: 2),
+
+              // Signature line
+              pw.Center(
+                child: pw.Text(
+                  'In lúc: ${DateFormat('HH:mm dd/MM/yyyy').format(DateTime.now())}',
+                  style: const pw.TextStyle(fontSize: 7),
+                ),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    children: [
+                      pw.Text('Nhân viên', style: smallStyle),
+                      pw.SizedBox(height: 20),
+                      pw.Text(employeeName, style: smallStyle),
+                    ],
+                  ),
+                  pw.Column(
+                    children: [
+                      pw.Text('Quản lý', style: smallStyle),
+                      pw.SizedBox(height: 20),
+                      pw.Text('...............', style: smallStyle),
+                    ],
+                  ),
+                ],
+              ),
+              pw.Text(
+                '.',
+                style: const pw.TextStyle(fontSize: 1, color: PdfColors.white),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    final pdfData = await pdf.save();
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdfData,
+      name: 'ShiftReport_${DateFormat('yyyyMMdd').format(date)}',
+    );
+  }
+
+  pw.Widget _buildReportRow(String label, String value, pw.TextStyle style) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 1),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(label, style: style),
+          pw.Text(value, style: style),
+        ],
+      ),
+    );
   }
 }

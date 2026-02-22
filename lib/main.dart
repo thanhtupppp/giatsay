@@ -23,6 +23,8 @@ import 'screens/settings/settings_screen.dart';
 import 'screens/inventory/material_list_screen.dart';
 import 'screens/timesheets/timesheet_screen.dart';
 import 'screens/pos/pos_screen.dart';
+import 'screens/reports/shift_report_screen.dart';
+import 'screens/reports/admin_revenue_report_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -152,6 +154,16 @@ final _router = GoRouter(
           path: '/shifts',
           pageBuilder: (context, state) =>
               const NoTransitionPage(child: TimesheetScreen()),
+        ),
+        GoRoute(
+          path: '/reports/shift',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: ShiftReportScreen()),
+        ),
+        GoRoute(
+          path: '/reports/revenue',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: AdminRevenueReportScreen()),
         ),
       ],
     ),

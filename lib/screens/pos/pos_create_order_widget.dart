@@ -480,8 +480,8 @@ class _POSCreateOrderWidgetState extends State<POSCreateOrderWidget> {
 
         // Right: Customer & Summary - Enhanced UI
         Container(
-          width: 400, // Wider panel
-          margin: const EdgeInsets.all(16),
+          width: 360,
+          margin: const EdgeInsets.fromLTRB(8, 8, 16, 8),
           child: Column(
             children: [
               // 1. Customer Card
@@ -618,7 +618,7 @@ class _POSCreateOrderWidgetState extends State<POSCreateOrderWidget> {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
 
               // 2. Order Details Card (Bill style)
               Expanded(
@@ -885,7 +885,7 @@ class _POSCreateOrderWidgetState extends State<POSCreateOrderWidget> {
                               ),
                       ),
 
-                      const Divider(thickness: 1, height: 32),
+                      const Divider(thickness: 1, height: 16),
 
                       // Total
                       Row(
@@ -893,12 +893,12 @@ class _POSCreateOrderWidgetState extends State<POSCreateOrderWidget> {
                         children: [
                           const Text(
                             'Tổng cộng:',
-                            style: TextStyle(fontSize: 16),
+                            style: TextStyle(fontSize: 15),
                           ),
                           Text(
                             currencyFormat.format(_totalAmount),
                             style: const TextStyle(
-                              fontSize: 24,
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF1565C0),
                             ),
@@ -909,12 +909,12 @@ class _POSCreateOrderWidgetState extends State<POSCreateOrderWidget> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
 
               // 3. Create Button
               SizedBox(
                 width: double.infinity,
-                height: 64,
+                height: 52,
                 child: PrimaryButton(
                   onPressed:
                       _isCreating ||
