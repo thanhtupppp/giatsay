@@ -214,6 +214,20 @@ class DatabaseHelper {
       )
     ''');
 
+    // Create service_materials mapping table
+    await db.execute('''
+      CREATE TABLE service_materials (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        service_id INTEGER NOT NULL,
+        material_id INTEGER NOT NULL,
+        quantity_per_unit REAL NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE,
+        FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
+        UNIQUE(service_id, material_id)
+      )
+    ''');
+
     // Create work_shifts table
     await db.execute('''
       CREATE TABLE work_shifts (
@@ -345,6 +359,22 @@ class DatabaseHelper {
           technician TEXT,
           created_at TEXT NOT NULL,
           FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE
+        )
+      ''');
+    }
+
+    if (oldVersion < 6) {
+      // Version 6: Add service_materials mapping table
+      await db.execute('''
+        CREATE TABLE service_materials (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          service_id INTEGER NOT NULL,
+          material_id INTEGER NOT NULL,
+          quantity_per_unit REAL NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE,
+          FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
+          UNIQUE(service_id, material_id)
         )
       ''');
     }

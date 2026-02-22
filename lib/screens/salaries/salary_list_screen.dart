@@ -5,6 +5,7 @@ import '../../models/salary.dart';
 import '../../models/user.dart';
 import '../../repositories/salary_repository.dart';
 import '../../repositories/user_repository.dart';
+import '../../repositories/shift_repository.dart';
 import '../../config/theme.dart';
 import '../../widgets/layouts/desktop_layout.dart';
 import '../../widgets/ui/cards.dart';
@@ -22,6 +23,7 @@ class SalaryListScreen extends StatefulWidget {
 class _SalaryListScreenState extends State<SalaryListScreen> {
   final _salaryRepo = SalaryRepository();
   final _userRepo = UserRepository();
+  final _shiftRepo = ShiftRepository();
 
   List<Map<String, dynamic>> _salaries = [];
   List<User> _employees = [];
@@ -219,6 +221,89 @@ class _SalaryListScreenState extends State<SalaryListScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
+
+                    // Auto-calculate from timesheets
+                    if (!isEdit)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: OutlinedButton.icon(
+                          onPressed: selectedEmployeeId == null
+                              ? null
+                              : () async {
+                                  try {
+                                    final workData = await _shiftRepo
+                                        .getMonthlyWorkHours(
+                                          selectedEmployeeId!,
+                                          selectedMonth,
+                                        );
+                                    final totalHours =
+                                        (workData['total_hours'] as double);
+                                    final totalDays =
+                                        (workData['total_days'] as int);
+
+                                    if (totalDays == 0) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Không tìm thấy dữ liệu chấm công trong tháng này',
+                                            ),
+                                            backgroundColor:
+                                                AppTheme.warningColor,
+                                          ),
+                                        );
+                                      }
+                                      return;
+                                    }
+
+                                    // Calculate: hourlyRate = 25,000đ/hour
+                                    const hourlyRate = 25000.0;
+                                    final calculatedSalary =
+                                        totalHours * hourlyRate;
+
+                                    setState(() {
+                                      baseSalaryController.text =
+                                          calculatedSalary.toStringAsFixed(0);
+                                    });
+
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Đã tính: $totalDays ngày, ${totalHours.toStringAsFixed(1)}h × 25.000đ = ${NumberFormat.currency(locale: 'vi', symbol: 'đ', decimalDigits: 0).format(calculatedSalary)}',
+                                          ),
+                                          backgroundColor:
+                                              AppTheme.successColor,
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Lỗi tính lương: $e'),
+                                          backgroundColor: AppTheme.errorColor,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                          icon: const Icon(Icons.calculate, size: 18),
+                          label: const Text('Tự tính từ chấm công'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.primaryColor,
+                            side: BorderSide(color: AppTheme.primaryColor),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
 
                     AppNumberField(
                       controller: baseSalaryController,

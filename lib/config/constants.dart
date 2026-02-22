@@ -5,7 +5,7 @@ class AppConstants {
 
   // Database
   static const String dbName = 'laundry_management.db';
-  static const int dbVersion = 5;
+  static const int dbVersion = 6;
 
   // Order Status
   static const String orderStatusReceived = 'received';

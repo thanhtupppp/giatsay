@@ -2,6 +2,8 @@ import 'package:intl/intl.dart';
 import '../core/database/database_helper.dart';
 import '../models/order.dart';
 import '../models/order_item.dart';
+import '../models/transaction.dart';
+import 'service_material_repository.dart';
 
 class OrderRepository {
   final DatabaseHelper _db = DatabaseHelper.instance;
@@ -58,13 +60,26 @@ class OrderRepository {
       // Insert order
       final orderId = await txn.insert('orders', order.toMap());
 
-      // Insert order items
       // Insert order items using batch
       final batch = txn.batch();
       for (final item in items) {
         batch.insert('order_items', item.copyWith(orderId: orderId).toMap());
       }
       await batch.commit(noResult: true);
+
+      // Auto-create income transaction if customer paid upfront
+      if (order.paidAmount > 0) {
+        final tx = Transaction(
+          type: 'income',
+          category: 'Bán hàng',
+          amount: order.paidAmount,
+          description: 'Thu tiền đơn hàng ${order.orderCode}',
+          orderId: orderId,
+          userId: order.employeeId,
+          transactionDate: order.receivedDate,
+        );
+        await txn.insert('transactions', tx.toMap());
+      }
 
       return orderId;
     });
@@ -253,29 +268,89 @@ class OrderRepository {
       updates['completed_date'] = DateTime.now().toIso8601String();
     }
 
-    return await _db.update(
+    final result = await _db.update(
       'orders',
       updates,
       where: 'id = ?',
       whereArgs: [orderId],
     );
+
+    // Auto-deduct materials when order moves to 'washing'
+    if (status == 'washing') {
+      try {
+        final orderItems = await getOrderItems(orderId);
+        final itemMaps = orderItems
+            .map(
+              (item) => {
+                'service_id': item.serviceId,
+                'quantity': item.quantity,
+              },
+            )
+            .toList();
+
+        final smRepo = ServiceMaterialRepository();
+        await smRepo.deductMaterialsForOrder(itemMaps);
+      } catch (e) {
+        // Log but don't fail the status update
+        // Materials will need manual adjustment if deduction fails
+      }
+    }
+
+    return result;
   }
 
   Future<int> updatePayment(
     int orderId,
     double paidAmount,
-    String? paymentMethod,
-  ) async {
-    return await _db.update(
-      'orders',
-      {
-        'paid_amount': paidAmount,
-        'payment_method': paymentMethod,
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [orderId],
-    );
+    String? paymentMethod, {
+    double incrementAmount = 0,
+    int? employeeId,
+  }) async {
+    final db = await _db.database;
+
+    return await db.transaction((txn) async {
+      // Update order payment
+      final result = await txn.update(
+        'orders',
+        {
+          'paid_amount': paidAmount,
+          'payment_method': paymentMethod,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [orderId],
+      );
+
+      // Auto-create income transaction for this payment
+      if (incrementAmount > 0) {
+        // Fetch order code for description
+        final orderRows = await txn.query(
+          'orders',
+          columns: ['order_code', 'employee_id'],
+          where: 'id = ?',
+          whereArgs: [orderId],
+        );
+        final orderCode = orderRows.isNotEmpty
+            ? orderRows.first['order_code'] as String
+            : 'N/A';
+        final empId =
+            employeeId ??
+            (orderRows.isNotEmpty ? orderRows.first['employee_id'] as int : 1);
+
+        final tx = Transaction(
+          type: 'income',
+          category: 'Bán hàng',
+          amount: incrementAmount,
+          description: 'Thanh toán đơn hàng $orderCode',
+          orderId: orderId,
+          userId: empId,
+          transactionDate: DateTime.now(),
+        );
+        await txn.insert('transactions', tx.toMap());
+      }
+
+      return result;
+    });
   }
 
   Future<List<Map<String, dynamic>>> getOrdersByCustomer(int customerId) async {
@@ -288,6 +363,8 @@ class OrderRepository {
   }
 
   Future<int> delete(int id) async {
+    // Delete linked income transactions first (no cascade on transactions)
+    await _db.delete('transactions', where: 'order_id = ?', whereArgs: [id]);
     // Order items will be automatically deleted due to ON DELETE CASCADE
     return await _db.delete('orders', where: 'id = ?', whereArgs: [id]);
   }

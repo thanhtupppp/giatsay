@@ -1,4 +1,3 @@
-
 import '../models/work_shift.dart';
 import '../models/timesheet.dart';
 import '../core/database/database_helper.dart';
@@ -31,7 +30,10 @@ class ShiftRepository {
   Future<int> createShift(WorkShift shift) async {
     final db = await _dbHelper.database;
     final now = DateTime.now();
-    return await db.insert(_shiftTable, shift.copyWith(createdAt: now, updatedAt: now).toMap());
+    return await db.insert(
+      _shiftTable,
+      shift.copyWith(createdAt: now, updatedAt: now).toMap(),
+    );
   }
 
   Future<int> updateShift(WorkShift shift) async {
@@ -56,7 +58,7 @@ class ShiftRepository {
     DateTime? toDate,
   }) async {
     final db = await _dbHelper.database;
-    
+
     String whereClause = '1=1';
     List<dynamic> args = [];
 
@@ -76,7 +78,8 @@ class ShiftRepository {
     }
 
     // Join with Users and WorkShifts to get names
-    final String sql = '''
+    final String sql =
+        '''
       SELECT t.*, u.full_name as employee_name, s.name as shift_name 
       FROM $_timesheetTable t
       LEFT JOIN users u ON t.employee_id = u.id
@@ -92,14 +95,17 @@ class ShiftRepository {
   Future<Timesheet?> getTodayTimesheet(int employeeId) async {
     final db = await _dbHelper.database;
     final today = DateTime.now().toIso8601String().split('T')[0];
-    
-    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+
+    final List<Map<String, dynamic>> maps = await db.rawQuery(
+      '''
       SELECT t.*, u.full_name as employee_name, s.name as shift_name 
       FROM $_timesheetTable t
       LEFT JOIN users u ON t.employee_id = u.id
       LEFT JOIN $_shiftTable s ON t.shift_id = s.id
       WHERE t.employee_id = ? AND t.work_date = ?
-    ''', [employeeId, today]);
+    ''',
+      [employeeId, today],
+    );
 
     if (maps.isNotEmpty) {
       return Timesheet.fromMap(maps.first);
@@ -126,7 +132,7 @@ class ShiftRepository {
   Future<int> checkOut(int timesheetId) async {
     final db = await _dbHelper.database;
     final now = DateTime.now();
-    
+
     return await db.update(
       _timesheetTable,
       {
@@ -137,5 +143,52 @@ class ShiftRepository {
       where: 'id = ?',
       whereArgs: [timesheetId],
     );
+  }
+
+  /// Calculate total work hours for an employee in a given month (yyyy-MM).
+  /// Returns: { 'total_hours': double, 'total_days': int }
+  Future<Map<String, dynamic>> getMonthlyWorkHours(
+    int employeeId,
+    String month,
+  ) async {
+    final db = await _dbHelper.database;
+
+    // month format: yyyy-MM
+    final startDate = '$month-01';
+    // Get last day of the month
+    final parts = month.split('-');
+    final year = int.parse(parts[0]);
+    final mon = int.parse(parts[1]);
+    final lastDay = DateTime(year, mon + 1, 0).day;
+    final endDate = '$month-${lastDay.toString().padLeft(2, '0')}';
+
+    // Calculate total hours from individual records
+    final rows = await db.rawQuery(
+      '''
+      SELECT check_in, check_out
+      FROM $_timesheetTable
+      WHERE employee_id = ? 
+        AND work_date BETWEEN ? AND ?
+        AND status = 'completed'
+        AND check_in IS NOT NULL
+        AND check_out IS NOT NULL
+    ''',
+      [employeeId, startDate, endDate],
+    );
+
+    double totalHours = 0;
+    int totalDays = rows.length;
+
+    for (final row in rows) {
+      final checkIn = DateTime.parse(row['check_in'] as String);
+      final checkOut = DateTime.parse(row['check_out'] as String);
+      final diff = checkOut.difference(checkIn);
+      totalHours += diff.inMinutes / 60.0;
+    }
+
+    return {
+      'total_hours': double.parse(totalHours.toStringAsFixed(1)),
+      'total_days': totalDays,
+    };
   }
 }

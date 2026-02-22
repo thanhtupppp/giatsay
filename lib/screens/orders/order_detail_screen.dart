@@ -401,20 +401,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
       try {
         final newPaidAmount = _order!.paidAmount + amount;
-        var updatedOrder = _order!.copyWith(
-          paidAmount: newPaidAmount,
-          paymentMethod: paymentMethod,
+        final currentUser = AuthService.instance.currentUser;
+
+        // Update payment and auto-create income Transaction
+        await _orderRepo.updatePayment(
+          _order!.id!,
+          newPaidAmount,
+          paymentMethod,
+          incrementAmount: amount,
+          employeeId: currentUser?.id,
         );
 
         // Auto-update status to Delivered if fully paid
         if (newPaidAmount >= _order!.totalAmount) {
-          updatedOrder = updatedOrder.copyWith(
-            status: AppConstants.orderStatusDelivered,
-            deliveryDate: DateTime.now(),
+          await _orderRepo.updateStatus(
+            _order!.id!,
+            AppConstants.orderStatusDelivered,
           );
         }
 
-        await _orderRepo.update(updatedOrder);
         await _loadOrderDetails();
 
         if (mounted) {

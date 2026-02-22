@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/service.dart';
+import '../../models/material_item.dart';
+import '../../models/service_material.dart';
 import '../../repositories/service_repository.dart';
+import '../../repositories/material_repository.dart';
+import '../../repositories/service_material_repository.dart';
 import '../../config/theme.dart';
 import '../../config/constants.dart';
 import '../../widgets/layouts/desktop_layout.dart';
@@ -19,6 +23,8 @@ class ServiceListScreen extends StatefulWidget {
 
 class _ServiceListScreenState extends State<ServiceListScreen> {
   final _serviceRepo = ServiceRepository();
+  final _smRepo = ServiceMaterialRepository();
+  final _materialRepo = MaterialRepository();
 
   List<Service> _services = [];
   bool _isLoading = true;
@@ -428,6 +434,159 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
       service: service,
       onEdit: () => _showAddEditDialog(service),
       onToggle: () => _toggleActiveStatus(service),
+      onConfigMaterials: () => _showMaterialMappingDialog(service),
+    );
+  }
+
+  Future<void> _showMaterialMappingDialog(Service service) async {
+    List<ServiceMaterial> mappings = await _smRepo.getByServiceId(service.id!);
+    List<MaterialItem> allMaterials = await _materialRepo.getAll();
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              width: 550,
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.inventory_2,
+                          color: Colors.teal,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'V\u1eadt t\u01b0 cho "${service.name}"',
+                              style: AppTheme.heading3,
+                            ),
+                            Text(
+                              'C\u1ea5u h\u00ecnh l\u01b0\u1ee3ng v\u1eadt t\u01b0 ti\u00eau hao m\u1ed7i ${AppConstants.serviceUnitLabels[service.unit] ?? service.unit}',
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Current mappings
+                  if (mappings.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'Ch\u01b0a c\u00f3 v\u1eadt t\u01b0 n\u00e0o \u0111\u01b0\u1ee3c c\u1ea5u h\u00ecnh',
+                        ),
+                      ),
+                    )
+                  else
+                    ...mappings.map(
+                      (m) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                m.materialName ??
+                                    'V\u1eadt t\u01b0 #${m.materialId}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '${m.quantityPerUnit} ${m.materialUnit ?? ''}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                size: 20,
+                                color: Colors.red,
+                              ),
+                              onPressed: () async {
+                                await _smRepo.delete(m.id!);
+                                final updated = await _smRepo.getByServiceId(
+                                  service.id!,
+                                );
+                                setState(() => mappings = updated);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
+
+                  // Add new mapping
+                  Text(
+                    'Th\u00eam v\u1eadt t\u01b0',
+                    style: AppTheme.bodyLarge.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _AddMaterialMappingRow(
+                    serviceId: service.id!,
+                    allMaterials: allMaterials,
+                    existingMaterialIds: mappings
+                        .map((m) => m.materialId)
+                        .toSet(),
+                    onAdded: () async {
+                      final updated = await _smRepo.getByServiceId(service.id!);
+                      setState(() => mappings = updated);
+                    },
+                  ),
+
+                  const SizedBox(height: 20),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: PrimaryButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      label: 'Xong',
+                      icon: Icons.check,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -436,11 +595,13 @@ class _ServiceCard extends StatefulWidget {
   final Service service;
   final VoidCallback onEdit;
   final VoidCallback onToggle;
+  final VoidCallback onConfigMaterials;
 
   const _ServiceCard({
     required this.service,
     required this.onEdit,
     required this.onToggle,
+    required this.onConfigMaterials,
   });
 
   @override
@@ -533,16 +694,124 @@ class _ServiceCardState extends State<_ServiceCard> {
                     ),
                   ],
                 ),
-                TextButton.icon(
-                  onPressed: widget.onEdit,
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: const Text('Sửa'),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton.icon(
+                      onPressed: widget.onConfigMaterials,
+                      icon: const Icon(Icons.inventory_2, size: 16),
+                      label: const Text('Vật tư'),
+                      style: TextButton.styleFrom(foregroundColor: Colors.teal),
+                    ),
+                    TextButton.icon(
+                      onPressed: widget.onEdit,
+                      icon: const Icon(Icons.edit, size: 16),
+                      label: const Text('Sửa'),
+                    ),
+                  ],
                 ),
               ],
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AddMaterialMappingRow extends StatefulWidget {
+  final int serviceId;
+  final List<MaterialItem> allMaterials;
+  final Set<int> existingMaterialIds;
+  final VoidCallback onAdded;
+
+  const _AddMaterialMappingRow({
+    required this.serviceId,
+    required this.allMaterials,
+    required this.existingMaterialIds,
+    required this.onAdded,
+  });
+
+  @override
+  State<_AddMaterialMappingRow> createState() => _AddMaterialMappingRowState();
+}
+
+class _AddMaterialMappingRowState extends State<_AddMaterialMappingRow> {
+  final _smRepo = ServiceMaterialRepository();
+  final _qtyController = TextEditingController(text: '1');
+  int? _selectedMaterialId;
+
+  @override
+  void dispose() {
+    _qtyController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final available = widget.allMaterials
+        .where((m) => !widget.existingMaterialIds.contains(m.id))
+        .toList();
+
+    if (available.isEmpty) {
+      return Text(
+        'Tất cả vật tư đã được cấu hình',
+        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          flex: 3,
+          child: DropdownButtonFormField<int>(
+            value: _selectedMaterialId,
+            decoration: const InputDecoration(
+              labelText: 'Chọn vật tư',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            items: available.map((m) {
+              return DropdownMenuItem(
+                value: m.id,
+                child: Text('${m.name} (${m.unit})'),
+              );
+            }).toList(),
+            onChanged: (v) => setState(() => _selectedMaterialId = v),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 1,
+          child: TextField(
+            controller: _qtyController,
+            decoration: const InputDecoration(
+              labelText: 'SL',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            ),
+            keyboardType: TextInputType.number,
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          onPressed: _selectedMaterialId == null
+              ? null
+              : () async {
+                  final qty = double.tryParse(_qtyController.text) ?? 1.0;
+                  final mapping = ServiceMaterial(
+                    serviceId: widget.serviceId,
+                    materialId: _selectedMaterialId!,
+                    quantityPerUnit: qty,
+                  );
+                  await _smRepo.create(mapping);
+                  _qtyController.text = '1';
+                  setState(() => _selectedMaterialId = null);
+                  widget.onAdded();
+                },
+          icon: const Icon(Icons.add_circle, color: Colors.teal),
+        ),
+      ],
     );
   }
 }
